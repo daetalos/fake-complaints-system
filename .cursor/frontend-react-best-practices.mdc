@@ -1,0 +1,540 @@
+---
+description: 
+globs: "**/*.jsx,**/*.tsx,**/components/**,**/hooks/**,**/contexts/**,**/pages/**,**/src/**"
+alwaysApply: false
+---
+---
+description: Enforce React best practices, component organization, and modern patterns
+---
+
+# React Framework Standards Rule
+
+## Core Requirements
+**ALWAYS use modern React patterns with TypeScript, functional components, and proper organization.** Follow established conventions for maintainable and scalable React applications.
+
+## Component Standards
+
+### Functional Components with TypeScript
+```typescript
+// ✅ Correct - Functional component with proper typing
+interface UserCardProps {
+  user: User;
+  onEdit: (user: User) => void;
+  onDelete: (id: number) => Promise<void>;
+  className?: string;
+  showActions?: boolean;
+}
+
+const UserCard: React.FC<UserCardProps> = ({
+  user,
+  onEdit,
+  onDelete,
+  className = '',
+  showActions = true,
+}) => {
+  const handleEdit = useCallback(() => {
+    onEdit(user);
+  }, [user, onEdit]);
+
+  const handleDelete = useCallback(async () => {
+    try {
+      await onDelete(user.id);
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+    }
+  }, [user.id, onDelete]);
+
+  return (
+    <div className={`user-card ${className}`}>
+      <h3>{user.name}</h3>
+      <p>{user.email}</p>
+      {showActions && (
+        <div className="actions">
+          <button onClick={handleEdit}>Edit</button>
+          <button onClick={handleDelete}>Delete</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default UserCard;
+
+// ❌ Wrong - Class components (avoid unless necessary)
+class UserCard extends Component<UserCardProps> {
+  render() {
+    return <div>{/* ... */}</div>;
+  }
+}
+
+// ❌ Wrong - No TypeScript interfaces
+const UserCard = ({ user, onEdit }) => {
+  return <div>{/* ... */}</div>;
+};
+```
+
+### Custom Hooks
+```typescript
+// ✅ Custom hooks for reusable logic
+import { useState, useEffect, useCallback } from 'react';
+
+interface UseApiState<T> {
+  data: T | null;
+  loading: boolean;
+  error: string | null;
+}
+
+export const useApi = <T>(url: string): UseApiState<T> & { refetch: () => void } => {
+  const [state, setState] = useState<UseApiState<T>>({
+    data: null,
+    loading: true,
+    error: null,
+  });
+
+  const fetchData = useCallback(async () => {
+    try {
+      setState(prev => ({ ...prev, loading: true, error: null }));
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setState({ data, loading: false, error: null });
+    } catch (error) {
+      setState({
+        data: null,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }, [url]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { ...state, refetch: fetchData };
+};
+
+// Usage
+const UserList = () => {
+  const { data: users, loading, error, refetch } = useApi<User[]>('/api/users');
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <div>
+      {users?.map(user => (
+        <UserCard key={user.id} user={user} onEdit={handleEdit} onDelete={handleDelete} />
+      ))}
+      <button onClick={refetch}>Refresh</button>
+    </div>
+  );
+};
+```
+
+## File Organization Standards
+
+### Directory Structure
+```
+src/
+├── components/           # Reusable UI components
+│   ├── ui/              # Basic UI elements (Button, Input, Modal)
+│   ├── forms/           # Form-specific components
+│   └── layout/          # Layout components (Header, Sidebar)
+├── pages/               # Page components
+├── hooks/               # Custom hooks
+├── contexts/            # React contexts
+├── services/            # API calls and external services
+├── utils/               # Utility functions
+├── types/               # TypeScript type definitions
+├── constants/           # Application constants
+└── assets/              # Static assets
+```
+
+### Component File Naming
+```typescript
+// ✅ Correct naming conventions
+components/
+├── UserCard/
+│   ├── index.ts         // Export barrel
+│   ├── UserCard.tsx     // Main component
+│   ├── UserCard.test.tsx // Tests
+│   └── UserCard.stories.tsx // Storybook stories
+
+// ✅ Alternative for simple components
+components/
+├── Button.tsx
+├── Input.tsx
+└── Modal.tsx
+
+// ❌ Wrong naming
+components/
+├── usercard.tsx         // Use PascalCase
+├── user-card.tsx       // Use PascalCase, not kebab-case
+└── userCard.js         // Use .tsx for React components
+```
+
+## State Management Patterns
+
+### useState and useReducer
+```typescript
+// ✅ Simple state with useState
+const UserForm = () => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    role: 'user' as const,
+  });
+
+  const handleChange = (field: keyof typeof formData) => (
+    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: event.target.value,
+    }));
+  };
+
+  return (
+    <form>
+      <input
+        type="text"
+        value={formData.name}
+        onChange={handleChange('name')}
+        placeholder="Name"
+      />
+      <input
+        type="email"
+        value={formData.email}
+        onChange={handleChange('email')}
+        placeholder="Email"
+      />
+    </form>
+  );
+};
+
+// ✅ Complex state with useReducer
+type FormState = {
+  values: Record<string, string>;
+  errors: Record<string, string>;
+  touched: Record<string, boolean>;
+  isSubmitting: boolean;
+};
+
+type FormAction =
+  | { type: 'SET_FIELD'; field: string; value: string }
+  | { type: 'SET_ERROR'; field: string; error: string }
+  | { type: 'SET_TOUCHED'; field: string }
+  | { type: 'SET_SUBMITTING'; isSubmitting: boolean }
+  | { type: 'RESET' };
+
+const formReducer = (state: FormState, action: FormAction): FormState => {
+  switch (action.type) {
+    case 'SET_FIELD':
+      return {
+        ...state,
+        values: { ...state.values, [action.field]: action.value },
+        errors: { ...state.errors, [action.field]: '' },
+      };
+    case 'SET_ERROR':
+      return {
+        ...state,
+        errors: { ...state.errors, [action.field]: action.error },
+      };
+    case 'SET_SUBMITTING':
+      return { ...state, isSubmitting: action.isSubmitting };
+    case 'RESET':
+      return {
+        values: {},
+        errors: {},
+        touched: {},
+        isSubmitting: false,
+      };
+    default:
+      return state;
+  }
+};
+```
+
+### Context for Global State
+```typescript
+// ✅ Typed React Context
+interface AuthContextType {
+  user: User | null;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  loading: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const login = useCallback(async (email: string, password: string) => {
+    try {
+      setLoading(true);
+      const response = await authService.login(email, password);
+      setUser(response.user);
+    } catch (error) {
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const logout = useCallback(() => {
+    setUser(null);
+    authService.logout();
+  }, []);
+
+  const value: AuthContextType = {
+    user,
+    login,
+    logout,
+    loading,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+// Custom hook for using auth context
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+```
+
+## Performance Optimization
+
+### Memoization
+```typescript
+// ✅ React.memo for component optimization
+const UserCard = React.memo<UserCardProps>(({ user, onEdit, onDelete }) => {
+  return (
+    <div>
+      <h3>{user.name}</h3>
+      <button onClick={() => onEdit(user)}>Edit</button>
+    </div>
+  );
+});
+
+// ✅ useMemo for expensive calculations
+const ExpensiveComponent = ({ items }: { items: Item[] }) => {
+  const expensiveValue = useMemo(() => {
+    return items.reduce((acc, item) => acc + item.value, 0);
+  }, [items]);
+
+  return <div>Total: {expensiveValue}</div>;
+};
+
+// ✅ useCallback for stable function references
+const UserList = () => {
+  const [users, setUsers] = useState<User[]>([]);
+
+  const handleDelete = useCallback(async (userId: number) => {
+    try {
+      await userService.deleteUser(userId);
+      setUsers(prev => prev.filter(user => user.id !== userId));
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+    }
+  }, []);
+
+  return (
+    <div>
+      {users.map(user => (
+        <UserCard key={user.id} user={user} onDelete={handleDelete} />
+      ))}
+    </div>
+  );
+};
+```
+
+### Lazy Loading
+```typescript
+// ✅ Route-based code splitting
+import { lazy, Suspense } from 'react';
+
+const UserDashboard = lazy(() => import('./pages/UserDashboard'));
+const AdminPanel = lazy(() => import('./pages/AdminPanel'));
+
+const App = () => {
+  return (
+    <BrowserRouter>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Routes>
+          <Route path="/dashboard" element={<UserDashboard />} />
+          <Route path="/admin" element={<AdminPanel />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
+};
+
+// ✅ Component-based lazy loading
+const LazyModal = lazy(() => import('./components/Modal'));
+
+const HomePage = () => {
+  const [showModal, setShowModal] = useState(false);
+
+  return (
+    <div>
+      <button onClick={() => setShowModal(true)}>Open Modal</button>
+      {showModal && (
+        <Suspense fallback={<div>Loading modal...</div>}>
+          <LazyModal onClose={() => setShowModal(false)} />
+        </Suspense>
+      )}
+    </div>
+  );
+};
+```
+
+## Form Handling
+
+### Controlled Components
+```typescript
+// ✅ Controlled form with validation
+interface FormData {
+  name: string;
+  email: string;
+  password: string;
+}
+
+const UserForm = () => {
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
+    email: '',
+    password: '',
+  });
+  const [errors, setErrors] = useState<Partial<FormData>>({});
+
+  const validateField = (field: keyof FormData, value: string): string => {
+    switch (field) {
+      case 'name':
+        return value.length < 2 ? 'Name must be at least 2 characters' : '';
+      case 'email':
+        return !/\S+@\S+\.\S+/.test(value) ? 'Invalid email format' : '';
+      case 'password':
+        return value.length < 8 ? 'Password must be at least 8 characters' : '';
+      default:
+        return '';
+    }
+  };
+
+  const handleChange = (field: keyof FormData) => (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const value = event.target.value;
+    setFormData(prev => ({ ...prev, [field]: value }));
+    
+    const error = validateField(field, value);
+    setErrors(prev => ({ ...prev, [field]: error }));
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    
+    // Validate all fields
+    const newErrors: Partial<FormData> = {};
+    (Object.keys(formData) as Array<keyof FormData>).forEach(field => {
+      const error = validateField(field, formData[field]);
+      if (error) newErrors[field] = error;
+    });
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    try {
+      await userService.createUser(formData);
+      // Handle success
+    } catch (error) {
+      // Handle error
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div>
+        <input
+          type="text"
+          value={formData.name}
+          onChange={handleChange('name')}
+          placeholder="Name"
+        />
+        {errors.name && <span className="error">{errors.name}</span>}
+      </div>
+      
+      <div>
+        <input
+          type="email"
+          value={formData.email}
+          onChange={handleChange('email')}
+          placeholder="Email"
+        />
+        {errors.email && <span className="error">{errors.email}</span>}
+      </div>
+      
+      <button type="submit">Submit</button>
+    </form>
+  );
+};
+```
+
+## Common Anti-patterns
+
+### React Violations
+```typescript
+// ❌ Wrong patterns to avoid
+
+// Direct DOM manipulation
+useEffect(() => {
+  document.getElementById('myElement').style.color = 'red'; // Use state/refs instead
+}, []);
+
+// Mutating props
+const BadComponent = ({ user }) => {
+  user.name = 'Modified'; // Props are immutable
+  return <div>{user.name}</div>;
+};
+
+// Missing dependency arrays
+useEffect(() => {
+  fetchData(userId); // Missing [userId] dependency
+});
+
+// Inline object/function creation in render
+const BadList = ({ items }) => {
+  return (
+    <div>
+      {items.map(item => (
+        <ItemCard 
+          key={item.id} 
+          item={item} 
+          style={{ margin: '10px' }} // Creates new object on every render
+          onClick={() => handleClick(item.id)} // Creates new function on every render
+        />
+      ))}
+    </div>
+  );
+};
+
+// Using array indices as keys
+{items.map((item, index) => (
+  <div key={index}>{item.name}</div> // Use stable unique IDs instead
+))}
+```
+
+
+**Remember: Modern React development emphasizes functional components, TypeScript, proper hooks usage, and performance optimization. Follow established patterns for maintainable and scalable applications.**
