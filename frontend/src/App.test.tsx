@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import App from './App';
+import './setup'; // Import the mock setup
 
 describe('App', () => {
   it('renders the main layout and home page', async () => {
