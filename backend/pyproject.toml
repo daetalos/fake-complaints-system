@@ -16,7 +16,32 @@ pytest = "^8.2.0"
 black = "^24.4.2"
 flake8 = "^7.0.0"
 mypy = "^1.10.0"
+ruff = "^0.12.0"
+pre-commit = "^4.2.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+# Set a comfortable line length. This is shared by the linter and formatter.
+line-length = 88
+# Exclude directories from all checks.
+extend-exclude = ["docs"]
+# Allow ruff to automatically fix issues.
+fix = true
+
+[tool.ruff.lint]
+# Select the rule sets to use.
+# E = pycodestyle errors
+# W = pycodestyle warnings
+# F = Pyflakes
+# I = isort
+select = ["E", "W", "F", "I"]
+
+[tool.ruff.format]
+# Use black-compatible formatting.
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

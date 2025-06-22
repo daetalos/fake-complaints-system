@@ -2,7 +2,7 @@
 # This file provides a convenient set of commands for common development tasks.
 
 # Use .PHONY to ensure these targets run even if a file with the same name exists.
-.PHONY: help build up down logs ps clean
+.PHONY: help setup build up down logs ps clean lint format
 
 # Set the default goal to 'help', so running 'make' by itself shows the help message.
 .DEFAULT_GOAL := help
@@ -10,16 +10,13 @@
 # Define variables for commands to ensure consistency.
 DOCKER_COMPOSE := docker-compose
 
-# Define color codes for pretty output.
-BLUE := \033[0;34m
-GREEN := \033[0;32m
-RESET := \033[0m
 
 ## help: Shows this help message.
 help:
 	@echo Usage: make [target]
 	@echo
 	@echo Available targets:
+	@echo   setup            Installs all dependencies and sets up the dev environment.
 	@echo   build            Builds or rebuilds all service images.
 	@echo   up               Starts all services in detached mode.
 	@echo   down             Stops and removes all services and networks.
@@ -27,6 +24,21 @@ help:
 	@echo   ps               Lists all running service containers.
 	@echo   clean            Stops services and removes all build artifacts.
 	@echo   help             Shows this help message.
+	@echo
+	@echo Code Quality:
+	@echo   lint             Checks the backend and frontend code for linting errors.
+	@echo   format           Formats the backend code according to project standards.
+
+## setup: Installs all project dependencies and development tools like pre-commit hooks.
+setup:
+	@echo "Setting up development environment..."
+	@echo "Installing backend dependencies..."
+	(cd backend && poetry install)
+	@echo "Installing frontend dependencies..."
+	(cd frontend && npm install)
+	@echo "Installing pre-commit hooks..."
+	(cd backend && poetry run pre-commit install)
+	@echo "Setup complete."
 
 ## build: Builds or rebuilds all services defined in docker-compose.yml.
 build:
@@ -64,4 +76,19 @@ clean: down
 	$(DOCKER_COMPOSE) rm -f
 	@echo Cleaning up Python artifacts...
 	@echo Cleaning up frontend build artifacts...
-	@echo Cleanup complete. 
+	@echo Cleanup complete.
+
+## lint: Checks the backend and frontend code for any linting issues.
+lint:
+	@echo "Linting backend code..."
+	(cd backend && poetry run ruff check .)
+	@echo "Linting frontend code..."
+	(cd frontend && npm run lint)
+	@echo "Linting complete."
+
+## format: Formats the backend Python code according to ruff standards.
+format:
+	@echo Formatting backend code...
+	(cd backend && poetry run ruff format .)
+	(cd backend && poetry run ruff check --fix .)
+	@echo Formatting complete. 
