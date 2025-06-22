@@ -3,6 +3,7 @@ name = "test-spectrum-system"
 version = "0.1.0"
 description = "Backend for the Test Spectrum System."
 authors = ["Mark O'Brien <markmikeobrien@gmail.com>"]
+packages = [{include = "test_spectrum_system", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
