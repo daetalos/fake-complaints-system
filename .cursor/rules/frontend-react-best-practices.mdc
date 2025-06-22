@@ -12,6 +12,17 @@ description: Enforce React best practices, component organization, and modern pa
 ## Core Requirements
 **ALWAYS use modern React patterns with TypeScript, functional components, and proper organization.** Follow established conventions for maintainable and scalable React applications.
 
+## Scaffolding First
+**ALWAYS establish the proper directory structure and create placeholder files *before* implementing significant component logic.** This "structure-first" approach prevents monolithic components and avoids the need for extensive refactoring later.
+
+**Workflow:**
+1.  **Identify Components:** Before coding, identify the pages, reusable components, services, and types needed for the feature.
+2.  **Create Directories:** Use `mkdir` to create the necessary directories (e.g., `src/pages`, `src/components/feature`, `src/services`).
+3.  **Create Placeholder Files:** Use `touch` or your IDE to create empty placeholder files (e.g., `src/pages/NewFeaturePage.tsx`, `src/components/feature/FeatureComponent.tsx`).
+4.  **Implement Logic:** With the structure in place, proceed to implement the logic within the appropriate files.
+
+This proactive approach ensures the project's architecture remains clean and organized from the start.
+
 ## Project Scaffolding with Vite
 
 **ALWAYS use Vite with the `React` + `TypeScript` template to initialize new frontend projects.** This provides a modern, fast, and well-configured development environment out of the the box.

@@ -540,7 +540,30 @@ jobs:
         run: npm ci
       - name: Type check
         run: npm run type-check
-```
 
+### Common Pitfalls
+
+#### Environment-Specific Types
+Be mindful that type definitions must be appropriate for the target environment (browser vs. Node.js server). Attempting to use types from a server-side module in client-side code will cause errors.
+
+-   **❌ Incorrect:** Importing a Node.js-specific module on the frontend.
+    ```typescript
+    // In a frontend file (e.g., src/types/index.ts)
+    import { UUID } from "crypto"; // Fails: 'crypto' is a Node.js module
+
+    export interface User {
+      id: UUID;
+    }
+    ```
+
+-   **✅ Correct:** Using environment-agnostic types or custom type definitions. A UUID is fundamentally a string.
+    ```typescript
+    // In a frontend file (e.g., src/types/index.ts)
+    export type UUID = string;
+
+    export interface User {
+      id: UUID;
+    }
+    ```
 
 **Remember: Type safety catches errors at development time rather than runtime. Use strict type checking, comprehensive annotations, and integrate type checking into your development workflow and CI/CD pipeline.**

@@ -235,3 +235,20 @@ select = ["E", "W", "F", "I"]
 quote-style = "double"
 indent-style = "space"
 ```
+
+## Environment Synchronization
+
+**Problem:** After changing dependencies in `pyproject.toml`, you may encounter errors like `ModuleNotFoundError` for a newly added package, or `pyproject.toml changed significantly since poetry.lock was last generated`. This happens because the `poetry.lock` file is out of sync or the virtual environment does not have the latest packages installed.
+
+**Solution:** Before running any local tooling after changing dependencies, **ALWAYS** run the following commands in sequence from your service directory (e.g., `backend/`):
+
+1.  **Update the lock file:**
+    ```powershell
+    poetry lock --no-update
+    ```
+
+2.  **Install dependencies from the lock file:**
+    ```powershell
+    poetry install
+    ```
+This two-step process ensures that your development environment is perfectly synchronized with the project's declared dependencies, preventing a common source of errors.

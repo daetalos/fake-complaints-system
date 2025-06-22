@@ -625,21 +625,14 @@ globalThis.fetch = vi.fn((url) => {
 
 ```
 
-``markdown
-### Test Assertion Principles
+## End-to-End (E2E) Testing with Playwright
 
-1.  **Be Precise:** Assertions must match the final rendered output *exactly*. Pay close attention to details like quotation marks, currency symbols, and extra whitespace. A test that looks for `Hello` will fail if the UI renders `"Hello"`.
-2.  **Test Behavior, Not Implementation:** Whenever possible, tests should assert what the *user* sees and experiences, not the internal state of a component. Use tools from Testing Library to find elements by their text, role, or label.
-```
+While Vitest is the standard for unit and integration testing, **Playwright is the recommended tool for E2E testing.** It is specifically designed for browser automation and simulating full user journeys.
+
+### E2E Configuration Note
+
+E2E tests require special configuration to allow the test runner to communicate with a containerized backend. Refer to the `@e2e-testing-strategy.mdc` rule for detailed guidance on setting up the necessary server proxy and isolated build configurations.
 
 ---
-
-
-
-
-
-
-
-
 
 **Remember: Consistent testing tools ensure reliable test execution and easier maintenance. Use pytest for all backend testing and Vitest/Jest for frontend testing with proper configuration and mocking strategies.**

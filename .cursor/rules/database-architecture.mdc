@@ -689,3 +689,32 @@ def get_user_by_email_bad(email: str):
 
 
 **Remember: Database performance and integrity are critical. Use proper indexes, foreign key constraints, query optimization, migration management, and monitoring to ensure a robust data layer.**
+
+### Local Development & Tooling
+
+When running command-line tools on the host machine (e.g., `alembic`, management scripts) that need to interact with containerized services and application code, special configuration is required.
+
+**1. Database Connectivity**
+
+-   **Problem:** Your application's `DATABASE_URL` is configured for the Docker network (e.g., using a service name like `db`), but your local tool needs to connect via `localhost`.
+-   **Solution:** Use a local `.env` file for host-specific overrides.
+    1.  Create a `.env` file in the `backend` directory (this is git-ignored).
+    2.  In `.env`, define the localhost connection: `DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/test_spectrum_system`
+    3.  Ensure your main configuration loader (e.g., `pydantic-settings` in `config/core.py`) reads from this `.env` file. This will be automatically used by local tools.
+    4.  The `docker-compose.yml` file should set the container-specific `DATABASE_URL` in the `environment` section, which will override the `.env` file inside the container.
+
+**2. Module Resolution (`ModuleNotFoundError`)**
+
+-   **Problem:** Tools like `alembic` may not respect the `pythonpath` set in `pyproject.toml`, leading to `ModuleNotFoundError`.
+-   **Solution:** Ensure the tool's entrypoint script correctly sets the `sys.path`. For Alembic, this is `alembic/env.py`.
+    ```python
+    # In alembic/env.py
+    import os
+    import sys
+
+    # Add the 'src' directory to the path to make the app module findable
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+    from test_spectrum_system.db.database import Base
+    # ... rest of the script
+    ```
