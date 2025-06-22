@@ -19,7 +19,7 @@ const ComplaintForm = () => {
         }
 
         try {
-            const apiUrl = `${import.meta.env.VITE_API_BASE_URL || ''}/api/complaints`;
+            const apiUrl = `/api/complaints`;
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
@@ -53,7 +53,6 @@ const ComplaintForm = () => {
                         id="description"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        required
                         rows={5}
                         style={{ width: '100%', padding: '8px' }}
                     />

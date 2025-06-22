@@ -1,15 +1,9 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import apiClient from '../../services/apiClient';
 import ComplaintForm from './ComplaintForm';
 
-// Mock the apiClient to control API calls in tests
-vi.mock('../../services/apiClient', () => ({
-  apiClient: {
-    post: vi.fn(),
-  },
-}));
-
-import { apiClient } from '../../services/apiClient';
+vi.mock('../../services/apiClient');
 
 describe('ComplaintForm', () => {
 
