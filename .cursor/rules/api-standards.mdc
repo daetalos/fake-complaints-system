@@ -505,5 +505,35 @@ async def get_user(id: int):
     return {"success": False, "error": "User not found"}  # Should use proper HTTP status
 ```
 
+## Cross-Origin Resource Sharing (CORS)
+
+**ALWAYS configure CORS middleware on the backend API if it is intended to be accessed by a frontend application.** Browsers will block cross-origin API requests by default for security reasons.
+
+### FastAPI Example
+For FastAPI applications, use the `CORSMiddleware` to explicitly allow origins, methods, and headers.
+
+```python
+from fastapi.middleware.cors import CORSMiddleware
+
+# List of origins that are allowed to make cross-origin requests.
+# For development, this should include the frontend's local development server.
+origins = [
+    "http://localhost:3000", # React's default dev port
+    "http://localhost:5173", # Vite's default dev port
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Or be more restrictive (e.g., ["GET", "POST"])
+    allow_headers=["*"],
+)
+```
+
+**Never use a wildcard (`"*"`) for `allow_origins` in a production environment.** Always specify the exact domain(s) of your frontend application.
+
+## Security Best Practices
+# ... existing code ...
 
 **Remember: RESTful API design ensures predictability and consistency. Follow HTTP standards, use proper status codes, maintain consistent URL patterns, and provide standardized response formats.**

@@ -1,0 +1,20 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Development Phases
+
+**Activation Trigger:** This document MUST be consulted at the beginning of any new project, or when adding the first feature to an empty repository. Its purpose is to establish a logical and predictable order of operations.
+
+## Project Build Order
+
+To ensure a logical and predictable project setup, features should be implemented in the following order. This avoids circular dependencies in tooling and configuration.
+
+1.  **Version Control Setup:** Initialize the Git repository, create a `main` branch, and establish basic files like `.gitignore` and `README.md`.
+2.  **Dependency Management:** Choose and set up the package managers for the backend (e.g., Poetry) and frontend (e.g., npm).
+3.  **Core Application Logic:** Implement the basic "hello world" functionality for the backend and/or frontend.
+4.  **Containerization:** Dockerize the applications and set up `docker-compose.yml`.
+5.  **Code Quality Tooling:** Integrate linters, formatters, and type checkers (e.g., `ruff`, `eslint`, `pre-commit`).
+6.  **Automation Layer:** Create the `Makefile` to provide a simple interface for all the above steps (build, run, lint, setup etc.). The `Makefile` should be one of the last pieces, as it automates the tools established in prior phases.
+7.  **CI/CD Pipeline:** Once the project is stable and has a robust set of Make commands, implement the continuous integration pipeline.
