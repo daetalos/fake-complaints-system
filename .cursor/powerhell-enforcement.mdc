@@ -122,5 +122,29 @@ python script.py
 ## Exception Cases
 If a command truly has no PowerShell equivalent, mention this explicitly and provide the best PowerShell alternative or suggest using Windows Subsystem for Linux (WSL) as a fallback.
 
+## Command Chaining
+
+**ALWAYS use a semicolon (`;`) to chain multiple commands on a single line.** Do not use `&&`, which is a shell-specific operator and not guaranteed to work in PowerShell environments.
+
+- ❌ `command1 && command2`
+- ✅ `command1; command2`
+
+**Example:**
+- ❌ `cd my-dir && ls`
+- ✅ `cd my-dir; ls`
+
+## Scripting Standards
+
+### Get-ChildItem -Recurse | Select-Object -First 10
+```powershell
+Get-ChildItem -Recurse | Select-Object -First 10
+```
+
+### if ($condition) { Write-Host "Success" } else { Write-Host "Failure" }
+```powershell
+if ($condition) { Write-Host "Success" } else { Write-Host "Failure" }
+```
+
+
 
 **Remember: This rule applies to ALL terminal command examples, documentation, and instructions provided.**
