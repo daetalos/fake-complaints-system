@@ -5,9 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 
+from test_spectrum_system.complaints import routes as complaints_router
+
 from .exceptions.base import ApplicationException, NotFoundError
 
 app = FastAPI(title="Test Spectrum System", version="0.1.0")
+
+app.include_router(complaints_router.router, prefix="/api", tags=["complaints"])
 
 # CORS Middleware Configuration
 # This allows the frontend (running on localhost:3000) to communicate with the backend.
