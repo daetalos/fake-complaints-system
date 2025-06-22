@@ -19,7 +19,7 @@ const ComplaintForm = () => {
         }
 
         try {
-            const apiUrl = `/api/complaints`;
+            const apiUrl = `/api/complaints/`;
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
@@ -36,8 +36,12 @@ const ComplaintForm = () => {
             const data = await response.json();
             setSuccess(`Complaint submitted successfully! Complaint ID: ${data.complaint_id}`);
             setDescription(''); // Clear the form
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err) {
+            if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError('An unknown error occurred.');
+            }
         } finally {
             setSubmitting(false);
         }

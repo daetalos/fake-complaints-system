@@ -1,5 +1,104 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
+# E2E Testing Strategy Rule
+
+## Core Requirements
+**ALWAYS ensure E2E tests are reliable, isolated, and accurately simulate user journeys.** This requires specific configurations to handle the interaction between the local test runner and containerized backend services.
+
+## Recommended Tool: Playwright
+
+For comprehensive E2E testing that involves browser automation, **Playwright is the recommended tool**. It provides a robust framework for interacting with web applications as a real user would. While Vitest is the standard for unit and integration tests, Playwright is purpose-built for the unique challenges of E2E testing.
+
+## Local Testing Against a Containerized Backend
+
+The most common challenge in local E2E testing is enabling the frontend test environment to communicate with a backend API running inside a Docker container.
+
+### 1. Configure a Dev Server Proxy
+
+The frontend development server must be configured to proxy API requests from the host machine to the containerized backend.
+
+**✅ Vite Proxy Configuration (`vite.config.ts`)**
+```typescript
+// vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    // This proxy forwards any requests made to '/api' from the frontend
+    // to the backend service running on localhost:8000.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
+  },
+});
+```
+With this configuration, a `fetch` request in the application to `/api/complaints` will be correctly routed to `http://localhost:8000/api/complaints`.
+
+### 2. Isolate Production Build Configuration
+
+The Docker build process for the frontend must be completely isolated from the local development environment. It should not attempt to use development-only dependencies or configurations.
+
+**✅ Use a Dedicated Build `tsconfig`**
+Create a `tsconfig.build.json` file that is self-contained and does not extend the main `tsconfig.json`. This ensures no development types (like `node` or `vitest`) are included in the production build check.
+
+```json
+// tsconfig.build.json
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "noEmit": true
+    // ... other essential build options
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "src/**/*.test.tsx", "src/**/*.spec.tsx"]
+}
+```
+**✅ Update `package.json` Build Script**
+Modify the `build` script to explicitly use this dedicated configuration. This is the critical step that enforces the separation.
+```json
+{
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && vite build"
+  }
+}
+```
+
+## Writing Reliable E2E Tests
+
+### Handling Form Validation
+
+Browser-native validation can interfere with tests designed to check custom JavaScript validation logic.
+
+**✅ Disable Native Validation for Tests**
+To ensure your custom validation logic is always triggered and can be tested, remove native validation attributes from form elements.
+
+```typescript
+// ❌ Wrong - Browser may block submission
+<textarea
+  id="description"
+  required 
+/>
+
+// ✅ Correct - Allows custom logic to be tested
+<textarea
+  id="description"
+/>
+```
+The component's `handleSubmit` function should be solely responsible for validating the input and displaying the appropriate error messages, which the E2E test can then reliably assert.
+

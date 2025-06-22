@@ -8,7 +8,7 @@ from test_spectrum_system.db.database import get_db
 router = APIRouter()
 
 
-@router.post("/complaints", response_model=schemas.Complaint, status_code=201)
+@router.post("/complaints/", response_model=schemas.Complaint, status_code=201)
 async def create_complaint(
     complaint: schemas.ComplaintCreate, db: AsyncSession = Depends(get_db)
 ):

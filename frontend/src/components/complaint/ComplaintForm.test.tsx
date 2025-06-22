@@ -1,11 +1,12 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
-import apiClient from '../../services/apiClient';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ComplaintForm from './ComplaintForm';
 
-vi.mock('../../services/apiClient');
-
 describe('ComplaintForm', () => {
+  beforeEach(() => {
+    // Reset all mocks before each test
+    vi.restoreAllMocks();
+  });
 
   it('should render the form correctly', () => {
     render(<ComplaintForm />);
@@ -26,13 +27,11 @@ describe('ComplaintForm', () => {
   });
 
   it('should submit the form and show a success message', async () => {
-    const mockResponse = {
-      complaint_id: '123e4567-e89b-12d3-a456-426614174000',
-      description: 'Test complaint',
-      created_at: new Date(),
-      updated_at: new Date(),
-    };
-    (apiClient.post as vi.Mock).mockResolvedValue(mockResponse);
+    const mockComplaintId = '123e4567-e89b-12d3-a456-426614174000';
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ complaint_id: mockComplaintId }),
+    } as Response);
 
     render(<ComplaintForm />);
 
@@ -43,15 +42,18 @@ describe('ComplaintForm', () => {
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText(/complaint submitted successfully!/i)).toBeInTheDocument();
+      expect(screen.getByText(`Complaint submitted successfully! Complaint ID: ${mockComplaintId}`)).toBeInTheDocument();
     });
 
-    expect(apiClient.post).toHaveBeenCalledWith('/complaints', { description: 'This is a test complaint.' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/complaints/', expect.any(Object));
   });
 
   it('should show an error message if the API call fails', async () => {
     const errorMessage = 'Something went wrong';
-    (apiClient.post as vi.Mock).mockRejectedValue(new Error(errorMessage));
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      json: () => Promise.resolve({ detail: errorMessage }),
+    } as Response);
 
     render(<ComplaintForm />);
 
@@ -64,5 +66,7 @@ describe('ComplaintForm', () => {
     await waitFor(() => {
       expect(screen.getByText(`Error: ${errorMessage}`)).toBeInTheDocument();
     });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/complaints/', expect.any(Object));
   });
 }); 

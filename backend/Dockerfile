@@ -20,17 +20,14 @@ COPY pyproject.toml poetry.lock ./
 # --no-root skips installing the project itself, which we will handle with PYTHONPATH
 RUN poetry install --only main --no-root && rm -rf $POETRY_CACHE_DIR
 
-# Now, copy the application source code into the current working directory
-COPY src/ .
+# Copy the application source code, preserving the src directory structure
+COPY ./src ./src
 
-# Add the app directory to the python path
-ENV PYTHONPATH="${PYTHONPATH}:/app"
+# Add the src directory to the python path
+ENV PYTHONPATH="${PYTHONPATH}:/app/src"
 
 # Expose the port the app runs on
 EXPOSE 8000
 
-# Command to run the application using the venv python
-# The module path is now relative to the python path
-# Command to run the application
-# We use the full path to the executable inside the venv
-CMD ["/app/.venv/bin/python", "-m", "uvicorn", "test_spectrum_system.main:app", "--host", "0.0.0.0", "--port", "8000"] 
+# Command to run the application using the full path to the venv python
+CMD ["/app/.venv/bin/python", "-m", "uvicorn", "test_spectrum_system.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--app-dir", "src"] 

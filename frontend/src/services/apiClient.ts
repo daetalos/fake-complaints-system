@@ -1,5 +1,5 @@
 const apiClient = {
-  post: async (url: string, data: any) => {
+  post: async <T>(url: string, data: Record<string, unknown>): Promise<T> => {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -9,7 +9,9 @@ const apiClient = {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({
+        detail: 'API request failed with non-JSON response',
+      }));
       throw new Error(errorData.detail || 'API request failed');
     }
 
@@ -17,4 +19,4 @@ const apiClient = {
   },
 };
 
-export default apiClient; 
+export default apiClient;
