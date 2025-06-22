@@ -1,4 +1,17 @@
 services:
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=test_spectrum_system
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+
   backend:
     build:
       context: ./backend
@@ -8,8 +21,11 @@ services:
     environment:
       - LOG_LEVEL=info
       - ENVIRONMENT=production
+      - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/test_spectrum_system
     networks:
       - app-network
+    depends_on:
+      - db
 
   frontend:
     build:
@@ -21,6 +37,9 @@ services:
       - "3000:80"
     depends_on:
       - backend
+
+volumes:
+  postgres_data:
 
 networks:
   app-network:
