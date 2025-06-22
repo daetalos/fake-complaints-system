@@ -1,0 +1,618 @@
+---
+description: 
+globs: "**/package.json,**/vite.config.*,**/webpack.config.*,**/next.config.*,**/public/**,**/src/assets/**,**/.env*,**/Dockerfile"
+alwaysApply: false
+---
+---
+description: Enforce optimized build configuration, asset management, and deployment practices
+---
+
+# Build & Deployment Rule
+
+## Core Requirements
+**ALWAYS optimize builds for production with proper asset management, caching strategies, and deployment configuration.** Ensure fast loading times and efficient resource usage.
+
+## Build Tool Configuration
+
+### Vite Configuration (Recommended)
+```typescript
+// vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  
+  // Path resolution
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+      '@components': resolve(__dirname, 'src/components'),
+      '@utils': resolve(__dirname, 'src/utils'),
+      '@assets': resolve(__dirname, 'src/assets'),
+    },
+  },
+  
+  // Build optimization
+  build: {
+    outDir: 'dist',
+    sourcemap: process.env.NODE_ENV !== 'production',
+    minify: 'terser',
+    
+    // Chunk splitting for better caching
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          ui: ['@headlessui/react', '@heroicons/react'],
+        },
+      },
+    },
+    
+    // Asset optimization
+    assetsInlineLimit: 4096, // 4kb
+    cssCodeSplit: true,
+    
+    // Performance budgets
+    chunkSizeWarningLimit: 1000,
+  },
+  
+  // Development server
+  server: {
+    port: 3000,
+    open: true,
+    host: true,
+  },
+  
+  // Preview server (for testing production builds)
+  preview: {
+    port: 3001,
+  },
+  
+  // Environment variables
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
+  },
+});
+```
+
+### Package.json Scripts
+```json
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "build:analyze": "vite build --mode analyze",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .ts,.tsx",
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "clean": "rm -rf dist node_modules/.vite",
+    "prepare": "husky install"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^4.4.0"
+  }
+}
+```
+
+### Next.js Configuration (Alternative)
+```javascript
+// next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Build optimization
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  
+  // Image optimization
+  images: {
+    formats: ['image/webp', 'image/avif'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+  },
+  
+  // Bundle analyzer
+  ...(process.env.ANALYZE === 'true' && {
+    webpack: (config) => {
+      config.plugins.push(
+        new (require('@next/bundle-analyzer'))({
+          enabled: true,
+        })
+      );
+      return config;
+    },
+  }),
+  
+  // Performance optimization
+  experimental: {
+    optimizeCss: true,
+    optimizePackageImports: ['lucide-react', 'date-fns'],
+  },
+  
+  // Headers for caching
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+        ],
+      },
+      {
+        source: '/static/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
+  },
+};
+
+module.exports = nextConfig;
+```
+
+## Asset Optimization
+
+### Image Management
+```typescript
+// utils/imageOptimization.ts
+export const IMAGE_FORMATS = {
+  WEBP: 'image/webp',
+  AVIF: 'image/avif',
+  JPEG: 'image/jpeg',
+  PNG: 'image/png',
+} as const;
+
+export const generateImageSrcSet = (
+  basePath: string,
+  sizes: number[] = [400, 800, 1200, 1600]
+): string => {
+  return sizes
+    .map(size => `${basePath}?w=${size} ${size}w`)
+    .join(', ');
+};
+
+// Image component with optimization
+interface OptimizedImageProps {
+  src: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  priority?: boolean;
+  className?: string;
+}
+
+export const OptimizedImage: React.FC<OptimizedImageProps> = ({
+  src,
+  alt,
+  width,
+  height,
+  priority = false,
+  className,
+}) => {
+  const srcSet = generateImageSrcSet(src);
+  
+  return (
+    <picture>
+      <source srcSet={srcSet} type="image/webp" />
+      <source srcSet={srcSet} type="image/avif" />
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        className={className}
+        loading={priority ? 'eager' : 'lazy'}
+        decoding="async"
+      />
+    </picture>
+  );
+};
+```
+
+### Asset Structure
+```
+src/assets/
+├── images/
+│   ├── icons/           # SVG icons
+│   ├── photos/          # Optimized photos (WebP/AVIF)
+│   └── illustrations/   # Vector illustrations
+├── fonts/               # Web fonts (WOFF2)
+├── styles/
+│   ├── globals.css      # Global styles
+│   └── components/      # Component-specific styles
+└── data/                # Static JSON data
+```
+
+### Font Optimization
+```css
+/* globals.css - Font loading optimization */
+@font-face {
+  font-family: 'Inter';
+  src: url('/assets/fonts/inter-var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap; /* Improve loading performance */
+}
+
+/* Preload critical fonts */
+/* Add to index.html head */
+/*
+<link
+  rel="preload"
+  href="/assets/fonts/inter-var.woff2"
+  as="font"
+  type="font/woff2"
+  crossorigin
+/>
+*/
+```
+
+## Performance Optimization
+
+### Code Splitting
+```typescript
+// ✅ Route-based splitting
+import { lazy, Suspense } from 'react';
+
+const Dashboard = lazy(() => import('../pages/Dashboard'));
+const Profile = lazy(() => import('../pages/Profile'));
+const Settings = lazy(() => import('../pages/Settings'));
+
+const AppRouter = () => (
+  <BrowserRouter>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
+      </Routes>
+    </Suspense>
+  </BrowserRouter>
+);
+
+// ✅ Component-based splitting
+const HeavyChart = lazy(() => import('../components/HeavyChart'));
+
+const Analytics = () => {
+  const [showChart, setShowChart] = useState(false);
+  
+  return (
+    <div>
+      <button onClick={() => setShowChart(true)}>Load Chart</button>
+      {showChart && (
+        <Suspense fallback={<ChartSkeleton />}>
+          <HeavyChart />
+        </Suspense>
+      )}
+    </div>
+  );
+};
+
+// ✅ Library splitting
+const Calendar = lazy(() => 
+  import('react-big-calendar').then(module => ({
+    default: module.Calendar
+  }))
+);
+```
+
+### Bundle Analysis
+```json
+{
+  "scripts": {
+    "analyze": "vite build && npx vite-bundle-analyzer dist",
+    "build:stats": "vite build --mode production && npx webpack-bundle-analyzer dist/stats.json"
+  }
+}
+```
+
+### Caching Strategies
+```typescript
+// service-worker.ts (for PWA)
+const CACHE_NAME = 'app-v1';
+const STATIC_ASSETS = [
+  '/',
+  '/static/css/main.css',
+  '/static/js/main.js',
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS))
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        // Return cached version or fetch from network
+        return response || fetch(event.request);
+      })
+  );
+});
+```
+
+## Environment Configuration
+
+### Environment Variables
+```bash
+# .env.example
+# API Configuration
+REACT_APP_API_URL=http://localhost:8000
+REACT_APP_API_TIMEOUT=10000
+
+# Feature Flags
+REACT_APP_ENABLE_ANALYTICS=true
+REACT_APP_ENABLE_DEBUG=false
+
+# External Services
+REACT_APP_SENTRY_DSN=https://your-sentry-dsn
+REACT_APP_GA_ID=GA-XXXXXXXXX
+
+# Build Configuration
+REACT_APP_VERSION=$npm_package_version
+REACT_APP_BUILD_DATE=$BUILD_DATE
+```
+
+### Environment-specific Builds
+```typescript
+// config/environment.ts
+interface Environment {
+  apiUrl: string;
+  apiTimeout: number;
+  enableAnalytics: boolean;
+  enableDebug: boolean;
+  version: string;
+}
+
+const environment: Environment = {
+  apiUrl: import.meta.env.REACT_APP_API_URL || 'http://localhost:8000',
+  apiTimeout: parseInt(import.meta.env.REACT_APP_API_TIMEOUT || '10000'),
+  enableAnalytics: import.meta.env.REACT_APP_ENABLE_ANALYTICS === 'true',
+  enableDebug: import.meta.env.REACT_APP_ENABLE_DEBUG === 'true',
+  version: import.meta.env.REACT_APP_VERSION || '1.0.0',
+};
+
+// Validate required environment variables
+const requiredEnvVars = ['REACT_APP_API_URL'];
+const missingEnvVars = requiredEnvVars.filter(
+  envVar => !import.meta.env[envVar]
+);
+
+if (missingEnvVars.length > 0) {
+  throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
+}
+
+export default environment;
+```
+
+## Docker Configuration
+
+### Multi-stage Dockerfile
+```dockerfile
+# Frontend Dockerfile
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY . .
+
+# Build application
+ARG REACT_APP_API_URL
+ARG REACT_APP_VERSION
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ENV REACT_APP_VERSION=$REACT_APP_VERSION
+
+RUN npm run build
+
+# Production stage
+FROM nginx:alpine
+
+# Copy built files
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost/ || exit 1
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Nginx Configuration
+```nginx
+# nginx.conf
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Cache static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Handle React Router
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # API proxy
+    location /api {
+        proxy_pass http://backend:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+## CI/CD Pipeline
+
+### GitHub Actions
+```yaml
+# .github/workflows/frontend.yml
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Type check
+        run: npm run type-check
+      
+      - name: Lint
+        run: npm run lint
+      
+      - name: Test
+        run: npm run test
+      
+      - name: Build
+        env:
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
+          REACT_APP_VERSION: ${{ github.sha }}
+        run: npm run build
+      
+      - name: Build Docker image
+        run: docker build -t frontend:${{ github.sha }} .
+      
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          uploadArtifacts: true
+```
+
+## Performance Monitoring
+
+### Web Vitals Tracking
+```typescript
+// utils/webVitals.ts
+import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals';
+
+export const reportWebVitals = (onPerfEntry?: (metric: any) => void) => {
+  if (onPerfEntry && onPerfEntry instanceof Function) {
+    getCLS(onPerfEntry);
+    getFID(onPerfEntry);
+    getFCP(onPerfEntry);
+    getLCP(onPerfEntry);
+    getTTFB(onPerfEntry);
+  }
+};
+
+// main.tsx
+import { reportWebVitals } from './utils/webVitals';
+
+// Report web vitals to analytics
+reportWebVitals((metric) => {
+  // Send to analytics service
+  analytics.track('Web Vital', {
+    name: metric.name,
+    value: metric.value,
+    rating: metric.rating,
+  });
+});
+```
+
+## Common Anti-patterns
+
+### Build Configuration Violations
+```typescript
+// ❌ Wrong - Poor build practices
+
+// No code splitting
+import Chart from 'react-chartjs-2'; // Loads entire library upfront
+
+// Unoptimized images
+<img src="/large-image.png" /> // No optimization or lazy loading
+
+// Missing environment validation
+const apiUrl = process.env.REACT_APP_API_URL; // Could be undefined
+
+// Inline styles/scripts in production
+<div style={{ fontSize: '16px' }}> // Should use CSS classes
+
+// No caching headers
+// Missing nginx configuration for static assets
+
+// Bundle everything together
+// No chunk splitting or vendor separation
+
+// ✅ Correct - Follow patterns above with:
+// - Proper code splitting
+// - Optimized assets
+// - Environment validation
+// - Production builds
+// - Caching strategies
+```
+
+
+**Remember: Optimized builds and deployment ensure fast loading times and excellent user experience. Use modern build tools, implement proper caching, and monitor performance metrics.**
