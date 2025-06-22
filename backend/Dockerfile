@@ -19,8 +19,8 @@ COPY pyproject.toml poetry.lock ./
 # --only main excludes development dependencies
 RUN poetry install --only main && rm -rf $POETRY_CACHE_DIR
 
-# Copy the rest of the application source code
-COPY . .
+# Copy the rest of the application source code from the src directory
+COPY ./src .
 
 # Expose the port the app runs on
 EXPOSE 8000
