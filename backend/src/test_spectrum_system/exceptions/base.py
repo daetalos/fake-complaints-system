@@ -39,6 +39,9 @@ class NotFoundError(ApplicationException):
         if identifier:
             message += f" (ID: {identifier})"
         super().__init__(message, status_code=404, **kwargs)
+        self.details["resource"] = resource
+        if identifier:
+            self.details["identifier"] = identifier
 
 
 class BusinessLogicError(ApplicationException):

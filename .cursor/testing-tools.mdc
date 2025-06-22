@@ -1,0 +1,645 @@
+---
+description: 
+globs: "**/pytest.ini,**/pyproject.toml,**/jest.config.*,**/vitest.config.*,**/package.json,**/conftest.py,**/setupTests.*"
+alwaysApply: false
+---
+---
+description: Enforce pytest for backend testing and Jest/Vitest for frontend testing with proper configuration
+---
+
+# Testing Tools & Configuration Rule
+
+## Core Requirements
+**ALWAYS use pytest for backend testing and Jest/Vitest for frontend testing.** Maintain consistent testing frameworks with proper configuration across the entire project.
+
+## Backend Testing with Pytest
+
+### Pytest Configuration
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--cov=app",
+    "--cov-report=html",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-fail-under=80",
+    "--no-cov-on-fail",
+]
+testpaths = ["tests"]
+# Add the source directory to the PYTHONPATH to prevent ModuleNotFoundError.
+# This is critical for tests to be able to import application code.
+pythonpath = ["src"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "unit: marks tests as unit tests",
+    "integration: marks tests as integration tests",
+    "e2e: marks tests as end-to-end tests",
+]
+filterwarnings = [
+    "error",
+    # It is acceptable to ignore specific, known warnings from third-party
+    # libraries that are out of our control.
+    "ignore:A specific warning message to ignore:SomeWarningCategory",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+]
+```
+
+### Required Dependencies
+```toml
+# pyproject.toml
+[tool.poetry.group.test.dependencies]
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
+pytest-mock = "^3.11.0"
+pytest-asyncio = "^0.21.0"
+pytest-xdist = "^3.3.0"  # For parallel testing
+pytest-sugar = "^0.9.7"  # Better output formatting
+pytest-clarity = "^1.0.1"  # Better assertion output
+factory-boy = "^3.3.0"   # Test data factories
+faker = "^19.6.0"        # Fake data generation
+```
+
+### Pytest Markers and Fixtures
+```python
+# conftest.py
+import pytest
+import asyncio
+from typing import Generator, AsyncGenerator
+from sqlalchemy.orm import Session
+from fastapi.testclient import TestClient
+
+# Configure asyncio for pytest-asyncio
+@pytest.fixture(scope="session")
+def event_loop():
+    """Create an instance of the default event loop for the test session."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+# Database fixtures
+@pytest.fixture(scope="session")
+def db_engine():
+    """Create test database engine."""
+    from app.database import create_test_engine
+    engine = create_test_engine()
+    Base.metadata.create_all(bind=engine)
+    yield engine
+    Base.metadata.drop_all(bind=engine)
+
+@pytest.fixture
+def db_session(db_engine) -> Generator[Session, None, None]:
+    """Create a clean database session for each test."""
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    session = SessionLocal(bind=connection)
+    
+    yield session
+    
+    session.close()
+    transaction.rollback()
+    connection.close()
+
+@pytest.fixture
+def client(db_session) -> TestClient:
+    """Create test client with database dependency override."""
+    def override_get_db():
+        yield db_session
+    
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+
+# Async fixtures
+@pytest.fixture
+async def async_client() -> AsyncGenerator[AsyncClient, None]:
+    """Create async test client."""
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
+
+# Mock fixtures
+@pytest.fixture
+def mock_redis(mocker):
+    """Mock Redis client."""
+    return mocker.patch("app.cache.redis_client")
+
+@pytest.fixture
+def mock_email_service(mocker):
+    """Mock email service."""
+    return mocker.patch("app.services.email_service.send_email")
+```
+
+### Pytest Usage Patterns
+```python
+# Example test with markers and fixtures
+import pytest
+from unittest.mock import Mock, patch
+
+@pytest.mark.unit
+class TestUserService:
+    def test_create_user_success(self, db_session, sample_user_data):
+        # Test implementation
+        pass
+    
+    @pytest.mark.slow
+    def test_expensive_operation(self):
+        # Slow test that can be skipped
+        pass
+
+@pytest.mark.integration
+class TestUserAPI:
+    def test_create_user_endpoint(self, client, sample_user_data):
+        response = client.post("/api/users", json=sample_user_data)
+        assert response.status_code == 201
+
+@pytest.mark.asyncio
+async def test_async_function(async_client):
+    """Test async function."""
+    response = await async_client.get("/api/health")
+    assert response.status_code == 200
+
+# Parametrized tests
+@pytest.mark.parametrize("email,expected", [
+    ("valid@example.com", True),
+    ("invalid-email", False),
+    ("", False),
+])
+def test_email_validation(email, expected):
+    result = validate_email(email)
+    assert result == expected
+```
+
+## Frontend Testing with Vitest (Recommended)
+
+### Vitest Configuration
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    css: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'src/test/',
+        '**/*.d.ts',
+        '**/*.config.*',
+        '**/coverage/**',
+      ],
+      thresholds: {
+        global: {
+          branches: 75,
+          functions: 75,
+          lines: 75,
+          statements: 75,
+        },
+        'src/components/': {
+          branches: 85,
+          functions: 85,
+          lines: 85,
+          statements: 85,
+        },
+      },
+    },
+  },
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+  },
+});
+```
+
+### Package.json Scripts
+```json
+{
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "test:watch": "vitest --watch"
+  },
+  "devDependencies": {
+    "vitest": "^0.34.0",
+    "@vitest/ui": "^0.34.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/user-event": "^14.4.0",
+    "jsdom": "^22.1.0",
+    "msw": "^1.3.0"
+  }
+}
+```
+
+### Test Setup File
+```typescript
+// src/test/setup.ts
+import { expect, afterEach, beforeAll, afterAll } from 'vitest';
+import { cleanup } from '@testing-library/react';
+import matchers from '@testing-library/jest-dom/matchers';
+import { server } from './mocks/server';
+
+// Extend Vitest's expect with jest-dom matchers
+expect.extend(matchers);
+
+// Setup MSW
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterEach(() => {
+  cleanup();
+  server.resetHandlers();
+});
+afterAll(() => server.close());
+
+// Mock window.matchMedia
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
+
+// Mock IntersectionObserver
+class MockIntersectionObserver {
+  observe = vi.fn();
+  disconnect = vi.fn();
+  unobserve = vi.fn();
+}
+
+Object.defineProperty(window, 'IntersectionObserver', {
+  writable: true,
+  configurable: true,
+  value: MockIntersectionObserver,
+});
+```
+
+## Alternative: Jest Configuration
+
+### Jest Configuration (if not using Vitest)
+```javascript
+// jest.config.js
+module.exports = {
+  testEnvironment: 'jsdom',
+  setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
+  moduleNameMapping: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/index.tsx',
+    '!src/reportWebVitals.ts',
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 75,
+      functions: 75,
+      lines: 75,
+      statements: 75,
+    },
+    'src/components/': {
+      branches: 85,
+      functions: 85,
+      lines: 85,
+      statements: 85,
+    },
+  },
+  transform: {
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+      tsconfig: 'tsconfig.json',
+    }],
+  },
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
+  testMatch: [
+    '<rootDir>/src/**/__tests__/**/*.{ts,tsx}',
+    '<rootDir>/src/**/*.{test,spec}.{ts,tsx}',
+  ],
+};
+```
+
+## Mock Service Worker (MSW) Setup
+
+### API Mocking Configuration
+```typescript
+// src/test/mocks/handlers.ts
+import { rest } from 'msw';
+
+export const handlers = [
+  // Users API
+  rest.get('/api/users', (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json({
+        success: true,
+        data: [
+          { id: 1, name: 'John Doe', email: 'john@example.com' },
+          { id: 2, name: 'Jane Smith', email: 'jane@example.com' },
+        ],
+      })
+    );
+  }),
+
+  rest.post('/api/users', async (req, res, ctx) => {
+    const userData = await req.json();
+    return res(
+      ctx.status(201),
+      ctx.json({
+        success: true,
+        data: { id: 3, ...userData },
+      })
+    );
+  }),
+
+  // Auth API
+  rest.post('/api/auth/login', async (req, res, ctx) => {
+    const { email, password } = await req.json();
+    
+    if (email === 'test@example.com' && password === 'password') {
+      return res(
+        ctx.status(200),
+        ctx.json({
+          success: true,
+          data: {
+            user: { id: 1, email: 'test@example.com', name: 'Test User' },
+            access_token: 'mock-jwt-token',
+          },
+        })
+      );
+    }
+    
+    return res(
+      ctx.status(401),
+      ctx.json({
+        success: false,
+        error: 'INVALID_CREDENTIALS',
+        message: 'Invalid email or password',
+      })
+    );
+  }),
+];
+
+// src/test/mocks/server.ts
+import { setupServer } from 'msw/node';
+import { handlers } from './handlers';
+
+export const server = setupServer(...handlers);
+```
+
+## Test Commands and Scripts
+
+### Backend Test Commands
+```bash
+# Run all tests
+poetry run pytest
+
+# Run with coverage
+poetry run pytest --cov=app --cov-report=html
+
+# Run specific test types
+poetry run pytest -m unit
+poetry run pytest -m integration
+poetry run pytest -m "not slow"
+
+# Run tests in parallel
+poetry run pytest -n auto
+
+# Run with verbose output
+poetry run pytest -v
+
+# Run specific test file
+poetry run pytest tests/unit/test_user_service.py
+
+# Run and stop on first failure
+poetry run pytest -x
+
+# Run last failed tests
+poetry run pytest --lf
+```
+
+### Frontend Test Commands
+```bash
+# Run all tests
+npm run test
+
+# Run tests once (CI mode)
+npm run test:run
+
+# Run with coverage
+npm run test:coverage
+
+# Run tests with UI
+npm run test:ui
+
+# Run specific test file
+npm run test user.test.tsx
+
+# Run tests matching pattern
+npm run test -- --grep="UserCard"
+
+# Update snapshots
+npm run test -- --update-snapshots
+```
+
+## Makefile Integration
+
+### Test Commands in Makefile
+```makefile
+## test: Run all tests
+test: test-backend test-frontend
+	@echo "$(GREEN)✅ All tests completed$(RESET)"
+
+## test-backend: Run Python tests
+test-backend:
+	@echo "$(BLUE)Running backend tests...$(RESET)"
+	poetry run pytest --cov=app --cov-report=term-missing
+
+## test-frontend: Run frontend tests
+test-frontend:
+	@echo "$(BLUE)Running frontend tests...$(RESET)"
+	cd frontend && npm run test:run
+
+## test-coverage: Run tests with coverage reports
+test-coverage:
+	@echo "$(BLUE)Running tests with coverage...$(RESET)"
+	poetry run pytest --cov=app --cov-report=html
+	cd frontend && npm run test:coverage
+
+## test-unit: Run only unit tests
+test-unit:
+	poetry run pytest -m unit
+	cd frontend && npm run test -- --grep="unit"
+
+## test-integration: Run only integration tests
+test-integration:
+	poetry run pytest -m integration
+	cd frontend && npm run test -- --grep="integration"
+
+## test-watch: Run tests in watch mode
+test-watch:
+	poetry run pytest-watch &
+	cd frontend && npm run test:watch
+```
+
+## CI/CD Integration
+
+### GitHub Actions Configuration
+```yaml
+# .github/workflows/test.yml
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+      
+      - name: Install dependencies
+        run: poetry install
+      
+      - name: Run tests
+        run: poetry run pytest --cov=app --cov-report=xml
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: backend
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm run test:coverage
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: frontend
+```
+
+## Common Anti-patterns
+
+### Testing Tool Violations
+```python
+# ❌ Wrong - Using inconsistent testing frameworks
+
+# Using unittest instead of pytest
+import unittest
+class TestUser(unittest.TestCase):  # Should use pytest
+
+# Using nose instead of pytest
+from nose.tools import assert_equal  # Deprecated
+
+# Mixed testing frameworks
+import pytest
+import unittest  # Don't mix frameworks
+```
+
+```typescript
+// ❌ Wrong - Frontend testing violations
+
+// Using different testing libraries inconsistently
+import { shallow } from 'enzyme';  // Should use Testing Library
+import { render } from '@testing-library/react';
+
+// No proper test setup
+// Missing setupFiles configuration
+
+// Wrong test environment
+// Using 'node' instead of 'jsdom' for React tests
+
+// ✅ Correct - Follow patterns above with:
+// - Consistent pytest for backend
+// - Vitest/Jest for frontend
+// - Proper configuration
+// - MSW for API mocking
+```
+
+### Test Setup Best Practices
+
+A `setup.ts` file should be used to configure the test environment before any tests run.
+
+```typescript
+// src/setup.ts
+import '@testing-library/jest-dom';
+import { vi } from 'vitest';
+
+// Use `globalThis` instead of `global` or `window` for environment-agnostic code.
+globalThis.fetch = vi.fn((url) => {
+  // Make mocks robust. Check for the relevant part of the URL (e.g., using
+  // `String(url).endsWith(...)`) instead of a hardcoded, exact match. This
+  // prevents tests from breaking if the base URL changes.
+  if (String(url).endsWith('/api/message')) {
+    return Promise.resolve(/* ... mock response ... */);
+  }
+  return Promise.reject(new Error(`Unhandled request: ${url}`));
+});
+```
+
+### Required Dependencies
+```typescript
+// package.json
+// ... existing code ...
+
+```
+
+``markdown
+### Test Assertion Principles
+
+1.  **Be Precise:** Assertions must match the final rendered output *exactly*. Pay close attention to details like quotation marks, currency symbols, and extra whitespace. A test that looks for `Hello` will fail if the UI renders `"Hello"`.
+2.  **Test Behavior, Not Implementation:** Whenever possible, tests should assert what the *user* sees and experiences, not the internal state of a component. Use tools from Testing Library to find elements by their text, role, or label.
+```
+
+---
+
+
+
+
+
+
+
+
+
+**Remember: Consistent testing tools ensure reliable test execution and easier maintenance. Use pytest for all backend testing and Vitest/Jest for frontend testing with proper configuration and mocking strategies.**

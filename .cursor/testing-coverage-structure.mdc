@@ -1,0 +1,637 @@
+---
+description: 
+globs: "**/*test*,**/*spec*,**/tests/**,**/__tests__/**,**/e2e/**,**/integration/**,**/.coveragerc,**/coverage/**"
+alwaysApply: false
+---
+---
+description: Enforce test coverage requirements, file organization, and testing standards across unit/integration/e2e tests
+---
+
+# Test Coverage & Structure Rule
+
+## Core Requirements
+**ALWAYS maintain comprehensive test coverage with proper organization.** Implement unit, integration, and e2e tests with minimum coverage thresholds and clear file structure.
+
+## Coverage Requirements
+
+### Minimum Coverage Thresholds
+```bash
+# Backend Coverage (Python)
+# Minimum 80% overall coverage
+# Minimum 90% for critical business logic
+# Minimum 70% for utility functions
+
+# Frontend Coverage (TypeScript/JavaScript)  
+# Minimum 75% overall coverage
+# Minimum 85% for components
+# Minimum 70% for utilities
+```
+
+### Coverage Configuration
+```ini
+# .coveragerc (Python)
+[run]
+source = backend
+omit = 
+    */venv/*
+    */migrations/*
+    */tests/*
+    */conftest.py
+    */settings/*
+    manage.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+
+[html]
+directory = htmlcov
+
+[coverage:report]
+fail_under = 80
+show_missing = True
+```
+
+```json
+// package.json (Frontend)
+{
+  "jest": {
+    "coverageThreshold": {
+      "global": {
+        "branches": 75,
+        "functions": 75,
+        "lines": 75,
+        "statements": 75
+      },
+      "src/components/": {
+        "branches": 85,
+        "functions": 85,
+        "lines": 85,
+        "statements": 85
+      }
+    },
+    "collectCoverageFrom": [
+      "src/**/*.{ts,tsx}",
+      "!src/**/*.d.ts",
+      "!src/index.tsx",
+      "!src/reportWebVitals.ts"
+    ]
+  }
+}
+```
+
+## Test File Organization
+
+### Backend Test Structure
+```
+backend/
+├── app/
+│   ├── models/
+│   │   ├── user.py
+│   │   └── post.py
+│   ├── services/
+│   │   ├── user_service.py
+│   │   └── auth_service.py
+│   └── api/
+│       ├── users.py
+│       └── auth.py
+├── tests/
+│   ├── unit/
+│   │   ├── models/
+│   │   │   ├── test_user.py
+│   │   │   └── test_post.py
+│   │   ├── services/
+│   │   │   ├── test_user_service.py
+│   │   │   └── test_auth_service.py
+│   │   └── utils/
+│   │       └── test_helpers.py
+│   ├── integration/
+│   │   ├── api/
+│   │   │   ├── test_users_api.py
+│   │   │   └── test_auth_api.py
+│   │   └── database/
+│   │       └── test_repositories.py
+│   ├── e2e/
+│   │   ├── test_user_workflow.py
+│   │   └── test_auth_workflow.py
+│   ├── fixtures/
+│   │   ├── database.py
+│   │   └── users.py
+│   └── conftest.py
+```
+
+### Frontend Test Structure
+```
+frontend/src/
+├── components/
+│   ├── UserCard/
+│   │   ├── UserCard.tsx
+│   │   ├── UserCard.test.tsx
+│   │   └── UserCard.stories.tsx
+│   └── Button/
+│       ├── Button.tsx
+│       └── Button.test.tsx
+├── hooks/
+│   ├── useAuth.ts
+│   └── useAuth.test.ts
+├── services/
+│   ├── api.ts
+│   └── api.test.ts
+├── utils/
+│   ├── helpers.ts
+│   └── helpers.test.ts
+├── __tests__/
+│   ├── integration/
+│   │   ├── user-flow.test.tsx
+│   │   └── auth-flow.test.tsx
+│   └── setup/
+│       ├── test-utils.tsx
+│       └── mocks.ts
+└── e2e/
+    ├── user-journey.spec.ts
+    └── auth-journey.spec.ts
+```
+
+## Test Types and Standards
+
+### Unit Tests
+```python
+# ✅ Backend Unit Test Example
+# tests/unit/services/test_user_service.py
+import pytest
+from unittest.mock import Mock, patch
+from app.services.user_service import UserService
+from app.models.user import User
+from app.exceptions import NotFoundError, ValidationError
+
+class TestUserService:
+    def setup_method(self):
+        self.mock_repo = Mock()
+        self.user_service = UserService(self.mock_repo)
+    
+    def test_create_user_success(self):
+        # Arrange
+        user_data = {"name": "John Doe", "email": "john@example.com"}
+        expected_user = User(id=1, **user_data)
+        self.mock_repo.create.return_value = expected_user
+        
+        # Act
+        result = self.user_service.create_user(user_data)
+        
+        # Assert
+        assert result == expected_user
+        self.mock_repo.create.assert_called_once_with(user_data)
+    
+    def test_create_user_validation_error(self):
+        # Arrange
+        invalid_data = {"name": "", "email": "invalid-email"}
+        
+        # Act & Assert
+        with pytest.raises(ValidationError) as exc_info:
+            self.user_service.create_user(invalid_data)
+        
+        assert "name" in str(exc_info.value)
+        self.mock_repo.create.assert_not_called()
+    
+    def test_get_user_not_found(self):
+        # Arrange
+        user_id = 999
+        self.mock_repo.get_by_id.return_value = None
+        
+        # Act & Assert
+        with pytest.raises(NotFoundError):
+            self.user_service.get_user(user_id)
+```
+
+```typescript
+// ✅ Frontend Unit Test Example
+// components/UserCard/UserCard.test.tsx
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { vi } from 'vitest';
+import UserCard from './UserCard';
+
+const mockUser = {
+  id: 1,
+  name: 'John Doe',
+  email: 'john@example.com',
+  isActive: true,
+};
+
+describe('UserCard', () => {
+  const mockOnEdit = vi.fn();
+  const mockOnDelete = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders user information correctly', () => {
+    render(
+      <UserCard 
+        user={mockUser} 
+        onEdit={mockOnEdit} 
+        onDelete={mockOnDelete} 
+      />
+    );
+
+    expect(screen.getByText('John Doe')).toBeInTheDocument();
+    expect(screen.getByText('john@example.com')).toBeInTheDocument();
+  });
+
+  it('calls onEdit when edit button is clicked', () => {
+    render(
+      <UserCard 
+        user={mockUser} 
+        onEdit={mockOnEdit} 
+        onDelete={mockOnDelete} 
+      />
+    );
+
+    fireEvent.click(screen.getByText('Edit'));
+    expect(mockOnEdit).toHaveBeenCalledWith(mockUser);
+  });
+
+  it('calls onDelete when delete button is clicked', async () => {
+    mockOnDelete.mockResolvedValue(undefined);
+
+    render(
+      <UserCard 
+        user={mockUser} 
+        onEdit={mockOnEdit} 
+        onDelete={mockOnDelete} 
+      />
+    );
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(mockOnDelete).toHaveBeenCalledWith(mockUser.id);
+    });
+  });
+
+  it('does not render actions when showActions is false', () => {
+    render(
+      <UserCard 
+        user={mockUser} 
+        onEdit={mockOnEdit} 
+        onDelete={mockOnDelete}
+        showActions={false}
+      />
+    );
+
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+    expect(screen.queryByText('Delete')).not.toBeInTheDocument();
+  });
+});
+```
+
+### Integration Tests
+```python
+# ✅ Backend Integration Test Example
+# tests/integration/api/test_users_api.py
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+class TestUsersAPI:
+    def test_create_user_success(self, client: TestClient, db: Session):
+        # Arrange
+        user_data = {
+            "name": "John Doe",
+            "email": "john@example.com",
+            "password": "securepassword123"
+        }
+        
+        # Act
+        response = client.post("/api/users", json=user_data)
+        
+        # Assert
+        assert response.status_code == 201
+        response_data = response.json()
+        assert response_data["data"]["name"] == user_data["name"]
+        assert response_data["data"]["email"] == user_data["email"]
+        assert "password" not in response_data["data"]
+        
+        # Verify in database
+        user = db.query(User).filter(User.email == user_data["email"]).first()
+        assert user is not None
+        assert user.name == user_data["name"]
+    
+    def test_create_user_duplicate_email(self, client: TestClient, sample_user: User):
+        # Arrange
+        user_data = {
+            "name": "Jane Doe",
+            "email": sample_user.email,  # Duplicate email
+            "password": "securepassword123"
+        }
+        
+        # Act
+        response = client.post("/api/users", json=user_data)
+        
+        # Assert
+        assert response.status_code == 409
+        response_data = response.json()
+        assert "email already exists" in response_data["message"].lower()
+```
+
+```typescript
+// ✅ Frontend Integration Test Example
+// __tests__/integration/user-flow.test.tsx
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
+import UserManagement from '../../src/pages/UserManagement';
+import { server } from '../setup/mocks';
+
+const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        {children}
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+};
+
+describe('User Management Flow', () => {
+  beforeAll(() => server.listen());
+  afterEach(() => server.resetHandlers());
+  afterAll(() => server.close());
+
+  it('creates a new user successfully', async () => {
+    render(
+      <TestWrapper>
+        <UserManagement />
+      </TestWrapper>
+    );
+
+    // Wait for initial load
+    await waitFor(() => {
+      expect(screen.getByText('Users')).toBeInTheDocument();
+    });
+
+    // Open create form
+    fireEvent.click(screen.getByText('Add User'));
+
+    // Fill form
+    fireEvent.change(screen.getByLabelText('Name'), {
+      target: { value: 'John Doe' },
+    });
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'john@example.com' },
+    });
+
+    // Submit form
+    fireEvent.click(screen.getByText('Create User'));
+
+    // Verify success
+    await waitFor(() => {
+      expect(screen.getByText('User created successfully')).toBeInTheDocument();
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+### E2E Tests
+```python
+# ✅ Backend E2E Test Example
+# tests/e2e/test_user_workflow.py
+import pytest
+from fastapi.testclient import TestClient
+
+class TestUserWorkflow:
+    def test_complete_user_lifecycle(self, client: TestClient):
+        # 1. Register user
+        register_data = {
+            "name": "John Doe",
+            "email": "john@example.com",
+            "password": "securepassword123"
+        }
+        response = client.post("/api/auth/register", json=register_data)
+        assert response.status_code == 201
+        user_id = response.json()["data"]["id"]
+        
+        # 2. Login
+        login_data = {
+            "email": "john@example.com",
+            "password": "securepassword123"
+        }
+        response = client.post("/api/auth/login", json=login_data)
+        assert response.status_code == 200
+        token = response.json()["data"]["access_token"]
+        
+        # 3. Access protected resource
+        headers = {"Authorization": f"Bearer {token}"}
+        response = client.get(f"/api/users/{user_id}", headers=headers)
+        assert response.status_code == 200
+        assert response.json()["data"]["name"] == "John Doe"
+        
+        # 4. Update profile
+        update_data = {"name": "John Smith"}
+        response = client.patch(f"/api/users/{user_id}", json=update_data, headers=headers)
+        assert response.status_code == 200
+        assert response.json()["data"]["name"] == "John Smith"
+        
+        # 5. Logout
+        response = client.post("/api/auth/logout", headers=headers)
+        assert response.status_code == 200
+```
+
+## Test Fixtures and Utilities
+
+### Backend Test Fixtures
+```python
+# tests/conftest.py
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from app.main import app
+from app.database import get_db, Base
+from app.models.user import User
+
+# Test database setup
+SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def override_get_db():
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+app.dependency_overrides[get_db] = override_get_db
+
+@pytest.fixture(scope="session")
+def db_engine():
+    Base.metadata.create_all(bind=engine)
+    yield engine
+    Base.metadata.drop_all(bind=engine)
+
+@pytest.fixture
+def db(db_engine):
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    db = TestingSessionLocal(bind=connection)
+    
+    yield db
+    
+    db.close()
+    transaction.rollback()
+    connection.close()
+
+@pytest.fixture
+def client():
+    return TestClient(app)
+
+@pytest.fixture
+def sample_user(db):
+    user = User(
+        name="Test User",
+        email="test@example.com",
+        hashed_password="hashed_password_here"
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+```
+
+### Frontend Test Utilities
+```typescript
+// __tests__/setup/test-utils.tsx
+import React, { ReactElement } from 'react';
+import { render, RenderOptions } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
+import { AuthProvider } from '../../src/contexts/AuthContext';
+
+const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+};
+
+const customRender = (
+  ui: ReactElement,
+  options?: Omit<RenderOptions, 'wrapper'>,
+) => render(ui, { wrapper: AllTheProviders, ...options });
+
+export * from '@testing-library/react';
+export { customRender as render };
+
+// Mock utilities
+export const createMockUser = (overrides = {}) => ({
+  id: 1,
+  name: 'Test User',
+  email: 'test@example.com',
+  isActive: true,
+  ...overrides,
+});
+
+export const createMockApiResponse = <T>(data: T) => ({
+  success: true,
+  data,
+  message: 'Success',
+});
+```
+
+## Coverage Reporting
+
+### Coverage Commands
+```bash
+# Backend coverage
+poetry run pytest --cov=app --cov-report=html --cov-report=term
+poetry run coverage report --fail-under=80
+
+# Frontend coverage
+npm run test -- --coverage
+npm run test:coverage:check
+```
+
+### CI/CD Integration
+```yaml
+# GitHub Actions example
+- name: Run tests with coverage
+  run: |
+    poetry run pytest --cov=app --cov-report=xml
+    npm run test -- --coverage --watchAll=false
+
+- name: Upload coverage reports
+  uses: codecov/codecov-action@v3
+  with:
+    files: ./coverage.xml,./coverage/lcov.info
+    fail_ci_if_error: true
+```
+
+## Common Anti-patterns
+
+### Testing Violations
+```python
+# ❌ Wrong - Poor testing practices
+
+# No assertions
+def test_user_creation():
+    create_user({"name": "John"})  # No assertions
+
+# Testing implementation details
+def test_user_service_calls_repository():
+    assert user_service.repository.called  # Testing internal calls
+
+# Overly complex tests
+def test_everything_at_once():
+    # 50 lines of setup and assertions testing multiple things
+
+# No test isolation
+def test_depends_on_previous_test():
+    # Assumes state from previous test
+
+# ❌ Frontend violations
+// No proper mocking
+test('api call', () => {
+  fetch('/api/users');  // Real network call
+});
+
+// Testing internal state
+expect(component.state.internalValue).toBe(true);
+
+// ✅ Correct - Follow patterns above with:
+// - Clear arrange/act/assert structure
+// - Proper mocking and isolation
+// - Testing behavior, not implementation
+// - Comprehensive coverage
+```
+
+
+**Remember: Comprehensive testing with proper organization ensures code quality and prevents regressions. Maintain high coverage, organize tests clearly, and follow testing best practices for maintainable test suites.**

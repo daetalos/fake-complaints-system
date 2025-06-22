@@ -89,4 +89,8 @@ def test_error_handling():
     An endpoint to test the custom error handling.
     """
     logger.info("Testing error handling by raising a NotFoundError.")
-    raise NotFoundError(resource="Test Resource", identifier="123")
+    raise NotFoundError(
+        resource="Test Resource",
+        identifier="123",
+        error_code="RESOURCE_NOT_FOUND",
+    )
