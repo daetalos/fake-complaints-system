@@ -8,6 +8,7 @@ authors = ["Mark O'Brien <markmikeobrien@gmail.com>"]
 python = "^3.11"
 fastapi = "^0.111.0"
 uvicorn = "^0.29.0"
+loguru = "^0.7.2"
 
 
 [tool.poetry.group.dev.dependencies]
