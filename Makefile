@@ -2,7 +2,7 @@
 # This file provides a convenient set of commands for common development tasks.
 
 # Use .PHONY to ensure these targets run even if a file with the same name exists.
-.PHONY: help setup build up down logs ps clean lint format
+.PHONY: help setup build up down logs ps clean lint format test test-backend test-frontend
 
 # Set the default goal to 'help', so running 'make' by itself shows the help message.
 .DEFAULT_GOAL := help
@@ -28,6 +28,11 @@ help:
 	@echo Code Quality:
 	@echo   lint             Checks the backend and frontend code for linting errors.
 	@echo   format           Formats the backend code according to project standards.
+	@echo
+	@echo Testing:
+	@echo   test             Runs all tests for both the frontend and backend.
+	@echo   test-backend     Runs the backend unit and integration tests.
+	@echo   test-frontend    Runs the frontend component and unit tests.
 
 ## setup: Installs all project dependencies and development tools like pre-commit hooks.
 setup:
@@ -39,6 +44,10 @@ setup:
 	@echo "Installing pre-commit hooks..."
 	(cd backend && poetry run pre-commit install)
 	@echo "Setup complete."
+
+## test: Runs all tests for the entire project.
+test: test-backend test-frontend
+	@echo "All tests complete."
 
 ## build: Builds or rebuilds all services defined in docker-compose.yml.
 build:
@@ -91,4 +100,16 @@ format:
 	@echo Formatting backend code...
 	(cd backend && poetry run ruff format .)
 	(cd backend && poetry run ruff check --fix .)
-	@echo Formatting complete. 
+	@echo Formatting complete.
+
+## test-backend: Runs the backend test suite using pytest.
+test-backend:
+	@echo "Running backend tests..."
+	(cd backend && poetry run pytest)
+	@echo "Backend tests complete."
+
+## test-frontend: Runs the frontend test suite using Vitest.
+test-frontend:
+	@echo "Running frontend tests..."
+	(cd frontend && npm test)
+	@echo "Frontend tests complete." 

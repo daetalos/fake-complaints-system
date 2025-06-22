@@ -84,6 +84,7 @@ logs
 # Testing
 /coverage
 /.nyc_output
+.coverage
 
 # Secrets
 *.pem

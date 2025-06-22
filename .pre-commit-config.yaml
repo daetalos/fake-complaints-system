@@ -9,4 +9,10 @@ repos:
         entry: make lint
         language: system
         pass_filenames: false
+        always_run: true
+    -   id: test
+        name: Run project tests
+        entry: make test
+        language: system
+        pass_filenames: false
         always_run: true 
