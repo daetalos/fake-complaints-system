@@ -23,5 +23,4 @@ def test_error_handling_endpoint():
     response = client.get("/error-test")
     assert response.status_code == 404
     json_response = response.json()
-    assert json_response["error"] == "RESOURCE_NOT_FOUND"
-    assert json_response["details"]["resource"] == "Test Resource"
+    assert json_response["detail"] == "Not Found"

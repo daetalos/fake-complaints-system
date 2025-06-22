@@ -1,17 +1,23 @@
+import asyncio
 import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
+from sqlalchemy import text
 
-from .exceptions.base import ApplicationException, NotFoundError
+from test_spectrum_system.complaints.routes import router as complaints_router
+from test_spectrum_system.config.core import settings
+from test_spectrum_system.db.database import create_db_and_tables, engine
 
-app = FastAPI(title="Test Spectrum System", version="0.1.0")
+from .exceptions.base import ApplicationException
 
-# CORS Middleware Configuration
-# This allows the frontend (running on localhost:3000) to communicate with the backend.
+app = FastAPI(title=settings.PROJECT_NAME)
+
+# Set up CORS middleware
 origins = [
+    "http://localhost",
     "http://localhost:3000",
 ]
 
@@ -23,13 +29,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(complaints_router, prefix="/api", tags=["complaints"])
+
 
 @app.exception_handler(ApplicationException)
 async def application_exception_handler(request: Request, exc: ApplicationException):
-    """
-    Catches and handles all custom ApplicationExceptions, logging them
-    and returning a standardized JSON response.
-    """
     log_message = (
         f"Application exception caught: {exc.error_code} on path {request.url.path}"
     )
@@ -48,9 +53,6 @@ async def application_exception_handler(request: Request, exc: ApplicationExcept
 
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
-    """
-    Middleware to log incoming requests and outgoing responses.
-    """
     start_time = time.time()
     logger.info(f"Incoming request: {request.method} {request.url.path}")
 
@@ -67,30 +69,28 @@ async def logging_middleware(request: Request, call_next):
 
 @app.get("/")
 def read_root():
-    """
-    Root endpoint for health checks.
-    """
-    logger.info("Root endpoint was called.")
     return {"Hello": "World"}
 
 
-@app.get("/api/message")
-def get_message():
-    """
-    Returns a simple message for the frontend to consume.
-    """
-    logger.info("Message API was called.")
-    return {"message": "Hello from the backend!"}
+@app.on_event("startup")
+async def on_startup():
+    # Wait for the database to be ready
+    max_retries = 10
+    retry_interval = 2
+    for attempt in range(max_retries):
+        try:
+            async with engine.connect() as connection:
+                await connection.execute(text("SELECT 1"))
+            logger.info("Database connection successful.")
+            break
+        except Exception as e:
+            logger.warning(
+                f"DB conn attempt {attempt + 1}/{max_retries} failed: {e}"
+            )
+            if attempt + 1 == max_retries:
+                logger.error("DB connection failed after multiple retries. Exiting.")
+                raise
+            await asyncio.sleep(retry_interval)
 
-
-@app.get("/error-test")
-def test_error_handling():
-    """
-    An endpoint to test the custom error handling.
-    """
-    logger.info("Testing error handling by raising a NotFoundError.")
-    raise NotFoundError(
-        resource="Test Resource",
-        identifier="123",
-        error_code="RESOURCE_NOT_FOUND",
-    )
+    # Create the database tables
+    await create_db_and_tables()

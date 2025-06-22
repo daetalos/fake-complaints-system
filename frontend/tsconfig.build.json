@@ -14,9 +14,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx",
-    "types": ["vitest/globals", "node"]
+    "jsx": "react-jsx"
   },
-  "include": ["src", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"],
-  "exclude": ["node_modules"]
-}
+  "include": ["src"],
+  "exclude": ["node_modules", "src/**/*.test.tsx", "src/**/*.spec.tsx"]
+} 

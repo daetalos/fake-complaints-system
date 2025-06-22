@@ -1,23 +1,19 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import App from './App';
 
 describe('App', () => {
-  it('renders the fetched message', async () => {
-    // Render the App component
+  it('renders the main layout and home page', async () => {
+    // Render the App component, which now includes the router
     render(<App />);
 
-    // Initially, the loading message should be present
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    // Check for a heading from the Home component
+    expect(
+      await screen.findByRole('heading', { name: /welcome to the complaint management system/i })
+    ).toBeInTheDocument();
 
-    // Wait for the "Hello from the backend!" message to appear.
-    // We use `waitFor` because the data fetching is asynchronous.
-    await waitFor(() => {
-      // The text must include the quotes, as rendered by the component.
-      expect(screen.getByText('"Hello from the backend!"')).toBeInTheDocument();
-    });
-
-    // After the message appears, the loading text should be gone.
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    // Check for the navigation links from the Layout component
+    expect(screen.getByRole('link', { name: /home/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /submit complaint/i })).toBeInTheDocument();
   });
 }); 
