@@ -67,6 +67,14 @@ async def logging_middleware(request: Request, call_next):
         raise
 
 
+@app.get("/api/health")
+def health_check():
+    """
+    Simple health check endpoint to confirm the API is running.
+    """
+    return {"status": "ok"}
+
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
