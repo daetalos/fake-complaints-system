@@ -12,6 +12,30 @@ description: Enforce React best practices, component organization, and modern pa
 ## Core Requirements
 **ALWAYS use modern React patterns with TypeScript, functional components, and proper organization.** Follow established conventions for maintainable and scalable React applications.
 
+## Project Scaffolding with Vite
+
+**ALWAYS use Vite with the `React` + `TypeScript` template to initialize new frontend projects.** This provides a modern, fast, and well-configured development environment out of the the box.
+
+**Recommended Scaffolding Process:**
+
+The most reliable method is to use the interactive command-line tool in your local terminal. Automation tools may struggle with this process.
+
+1.  **Run the interactive command from the project root:**
+    ```powershell
+    npm create vite@latest
+    ```
+2.  **Follow the prompts:**
+    -   **Project name:** `frontend`
+    -   **Select a framework:** `React`
+    -   **Select a variant:** `TypeScript`
+3.  **Install dependencies:**
+    ```powershell
+    cd frontend
+    npm install
+    ```
+
+This ensures a correct and complete project setup.
+
 ## Component Standards
 
 ### Functional Components with TypeScript
@@ -535,6 +559,8 @@ const BadList = ({ items }) => {
   <div key={index}>{item.name}</div> // Use stable unique IDs instead
 ))}
 ```
+
+
 
 
 **Remember: Modern React development emphasizes functional components, TypeScript, proper hooks usage, and performance optimization. Follow established patterns for maintainable and scalable applications.**
