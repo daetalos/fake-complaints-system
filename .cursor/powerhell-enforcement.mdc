@@ -1,0 +1,126 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: Enforce PowerShell-compatible terminal commands instead of Bash/Unix commands
+---
+
+# PowerShell Terminal Commands Rule
+
+## Core Requirement
+**ALWAYS use PowerShell-compatible commands instead of Bash/Unix commands.** This project operates in a Windows PowerShell environment.
+
+## Command Replacements
+
+### File and Directory Operations
+- ❌ `ls` → ✅ `Get-ChildItem` or `dir`
+- ❌ `cp file.txt newfile.txt` → ✅ `Copy-Item file.txt newfile.txt`
+- ❌ `mv file.txt newname.txt` → ✅ `Move-Item file.txt newname.txt`
+- ❌ `rm file.txt` → ✅ `Remove-Item file.txt`
+- ❌ `mkdir dirname` → ✅ `New-Item -ItemType Directory -Name dirname`
+- ❌ `touch file.txt` → ✅ `New-Item -ItemType File -Name file.txt`
+- ❌ `cat file.txt` → ✅ `Get-Content file.txt`
+- ❌ `find . -name "*.js"` → ✅ `Get-ChildItem -Recurse -Filter "*.js"`
+
+### Path Operations
+- ❌ Forward slashes: `/path/to/file` → ✅ Backslashes: `\path\to\file` or use relative paths
+- ❌ `pwd` → ✅ `Get-Location` or `pwd` (PowerShell alias)
+- ❌ `cd /path` → ✅ `Set-Location C:\path` or `cd C:\path`
+
+### Environment Variables
+- ❌ `$PATH` → ✅ `$env:PATH`
+- ❌ `export VAR=value` → ✅ `$env:VAR = "value"`
+- ❌ `echo $HOME` → ✅ `Write-Host $env:USERPROFILE`
+
+### Process Management
+- ❌ `ps aux` → ✅ `Get-Process`
+- ❌ `kill -9 1234` → ✅ `Stop-Process -Id 1234 -Force`
+- ❌ `which command` → ✅ `Get-Command command`
+
+### Package Management
+- ❌ `npm install` → ✅ `npm install` (npm works in PowerShell)
+- ❌ `sudo apt install` → ✅ `winget install` or `choco install`
+- ❌ `brew install` → ✅ `winget install` or `choco install`
+
+### Command Chaining and Operators
+- ❌ `command1 && command2` → ✅ `command1; if ($?) { command2 }`
+- ❌ `command1 || command2` → ✅ `command1; if (-not $?) { command2 }`
+- ❌ `command > file.txt` → ✅ `command | Out-File file.txt`
+- ❌ `command >> file.txt` → ✅ `command | Out-File file.txt -Append`
+
+### Text Processing
+- ❌ `grep "pattern" file.txt` → ✅ `Select-String "pattern" file.txt`
+- ❌ `head -n 10 file.txt` → ✅ `Get-Content file.txt | Select-Object -First 10`
+- ❌ `tail -n 10 file.txt` → ✅ `Get-Content file.txt | Select-Object -Last 10`
+- ❌ `wc -l file.txt` → ✅ `(Get-Content file.txt).Count`
+
+## PowerShell-Specific Best Practices
+
+### Use PowerShell Cmdlets
+Prefer full cmdlet names for clarity, but aliases are acceptable:
+```powershell
+# Preferred
+Get-ChildItem -Path "." -Recurse
+# Acceptable
+ls -Recurse
+```
+
+### Proper Error Handling
+```powershell
+try {
+    # Command here
+    Write-Host "Success"
+} catch {
+    Write-Error "Failed: $_"
+}
+```
+
+### Variable Declaration
+```powershell
+# Use PowerShell variable syntax
+$myVariable = "value"
+$env:PATH += ";C:\new\path"
+```
+
+### Pipeline Usage
+```powershell
+# Leverage PowerShell pipelines
+Get-Process | Where-Object {$_.Name -like "*chrome*"} | Stop-Process
+```
+
+## Common Development Commands (PowerShell)
+
+### Git Operations (work the same)
+```powershell
+git clone https://github.com/user/repo.git
+git add .
+git commit -m "message"
+git push origin main
+```
+
+### Node.js/npm (work the same)
+```powershell
+npm install
+npm run build
+npm start
+```
+
+### Python (work the same)
+```powershell
+python -m pip install package
+python script.py
+```
+
+## When Providing Examples
+- Always show PowerShell commands in code blocks
+- Include full paths with backslashes when relevant
+- Use PowerShell-native cmdlets when available
+- Explain PowerShell-specific syntax when necessary
+
+## Exception Cases
+If a command truly has no PowerShell equivalent, mention this explicitly and provide the best PowerShell alternative or suggest using Windows Subsystem for Linux (WSL) as a fallback.
+
+
+**Remember: This rule applies to ALL terminal command examples, documentation, and instructions provided.**

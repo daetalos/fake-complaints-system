@@ -1,0 +1,546 @@
+---
+description: 
+globs: "**/*.py,**/*.ts,**/*.tsx,**/tsconfig.json,**/pyproject.toml,**/schemas/**,**/types/**,**/models/**"
+alwaysApply: false
+---
+---
+description: Enforce strict type safety with TypeScript and Python type hints
+---
+
+# Type Safety Rule
+
+## Core Requirements
+**ALWAYS use strict type checking and comprehensive type annotations.** Type safety prevents runtime errors and improves code maintainability.
+
+## Python Type Safety with MyPy
+
+### MyPy Configuration
+```toml
+# pyproject.toml
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.7.0"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+strict_optional = true
+strict_equality = true
+disallow_any_generics = true
+
+# Module-specific overrides
+[[tool.mypy.overrides]]
+module = "external_library.*"
+ignore_missing_imports = true
+```
+
+### Python Type Annotation Standards
+```python
+from typing import List, Dict, Optional, Union, Any, Callable, Generic, TypeVar
+from typing_extensions import Literal, TypedDict
+from pydantic import BaseModel
+from datetime import datetime
+
+# ✅ Function type annotations
+def process_user_data(
+    users: List[Dict[str, Union[str, int]]], 
+    filter_active: bool = True,
+    transform_fn: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
+) -> List[Dict[str, str]]:
+    """Process user data with comprehensive type annotations."""
+    result: List[Dict[str, str]] = []
+    
+    for user in users:
+        if filter_active and user.get("status") == "active":
+            processed_user = transform_fn(user) if transform_fn else user
+            result.append({
+                "name": str(processed_user["name"]),
+                "email": str(processed_user["email"])
+            })
+    
+    return result
+
+# ✅ Class with type annotations
+class UserService:
+    def __init__(self, database_url: str, timeout: int = 30) -> None:
+        self.database_url = database_url
+        self.timeout = timeout
+        self._cache: Dict[int, Dict[str, Any]] = {}
+    
+    async def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get user by ID with proper return type."""
+        if user_id in self._cache:
+            return self._cache[user_id]
+        
+        # Database call would go here
+        user_data: Optional[Dict[str, Any]] = None
+        
+        if user_data:
+            self._cache[user_id] = user_data
+        
+        return user_data
+    
+    def clear_cache(self) -> None:
+        """Clear user cache."""
+        self._cache.clear()
+
+# ✅ Generic types and TypeVar
+T = TypeVar('T')
+K = TypeVar('K')
+V = TypeVar('V')
+
+class Repository(Generic[T]):
+    def __init__(self, model_class: type[T]) -> None:
+        self.model_class = model_class
+        self._items: List[T] = []
+    
+    def add(self, item: T) -> T:
+        self._items.append(item)
+        return item
+    
+    def find_by_id(self, item_id: int) -> Optional[T]:
+        # Implementation would go here
+        return None
+    
+    def get_all(self) -> List[T]:
+        return self._items.copy()
+
+# ✅ TypedDict for structured dictionaries
+class UserDict(TypedDict):
+    id: int
+    name: str
+    email: str
+    is_active: bool
+    created_at: datetime
+
+def create_user_dict(name: str, email: str) -> UserDict:
+    return {
+        "id": 1,
+        "name": name,
+        "email": email,
+        "is_active": True,
+        "created_at": datetime.now()
+    }
+
+# ✅ Literal types for restricted values
+UserRole = Literal["admin", "user", "moderator"]
+
+def assign_role(user_id: int, role: UserRole) -> bool:
+    """Assign role to user with restricted role values."""
+    # Implementation here
+    return True
+
+# ❌ Wrong - Missing or poor type annotations
+def bad_function(data):  # No parameter type
+    return data  # No return type
+
+def poor_typing(users: List) -> Dict:  # Too generic
+    pass
+
+def any_everywhere(data: Any) -> Any:  # Defeats purpose of typing
+    pass
+```
+
+### Pydantic Models for Runtime Type Validation
+```python
+from pydantic import BaseModel, Field, validator, root_validator
+from typing import Optional, List
+from datetime import datetime
+from enum import Enum
+
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    USER = "user"
+    MODERATOR = "moderator"
+
+class UserBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    email: str = Field(..., regex=r'^[^@]+@[^@]+\.[^@]+$')
+    age: Optional[int] = Field(None, ge=18, le=120)
+    role: UserRole = UserRole.USER
+
+    @validator('name')
+    def name_must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError('Name cannot be empty')
+        return v.strip()
+
+class UserCreate(UserBase):
+    password: str = Field(..., min_length=8)
+    
+    @validator('password')
+    def validate_password(cls, v: str) -> str:
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain digit')
+        return v
+
+class UserResponse(UserBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True  # For SQLAlchemy integration
+
+# ✅ Usage with FastAPI
+from fastapi import FastAPI, HTTPException
+
+app = FastAPI()
+
+@app.post("/users", response_model=UserResponse)
+async def create_user(user: UserCreate) -> UserResponse:
+    """Create user with automatic validation."""
+    # Pydantic automatically validates the input
+    # Type hints ensure proper IDE support
+    pass
+```
+
+### MyPy Commands
+```powershell
+# Check types
+poetry run mypy .
+
+# Check specific files
+poetry run mypy backend/main.py
+
+# Generate type coverage report
+poetry run mypy --html-report mypy-report .
+
+# Check with strict mode
+poetry run mypy --strict .
+```
+
+## TypeScript Configuration & Standards
+
+### Strict TypeScript Configuration
+```json
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": ["dom", "dom.iterable", "es6"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "build"]
+}
+```
+
+### TypeScript Interface & Type Standards
+```typescript
+// ✅ Comprehensive interface definitions
+interface User {
+  readonly id: number;
+  name: string;
+  email: string;
+  age?: number;
+  isActive: boolean;
+  role: 'admin' | 'user' | 'moderator';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface CreateUserRequest {
+  name: string;
+  email: string;
+  age?: number;
+  role?: User['role'];
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+  errors?: Record<string, string[]>;
+}
+
+interface PaginatedResponse<T> extends ApiResponse<T[]> {
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+// ✅ Union types and discriminated unions
+type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+
+interface LoadingAction {
+  type: 'SET_LOADING';
+  payload: LoadingState;
+}
+
+interface SetDataAction<T> {
+  type: 'SET_DATA';
+  payload: T;
+}
+
+interface SetErrorAction {
+  type: 'SET_ERROR';
+  payload: string;
+}
+
+type Action<T> = LoadingAction | SetDataAction<T> | SetErrorAction;
+
+// ✅ Generic interfaces and utility types
+interface Repository<T, K = number> {
+  findById(id: K): Promise<T | null>;
+  findAll(): Promise<T[]>;
+  create(entity: Omit<T, 'id'>): Promise<T>;
+  update(id: K, updates: Partial<T>): Promise<T>;
+  delete(id: K): Promise<boolean>;
+}
+
+// ✅ Function type definitions
+type ValidationRule<T> = (value: T) => string | null;
+type AsyncValidator<T> = (value: T) => Promise<string | null>;
+
+interface FormField<T> {
+  value: T;
+  error?: string;
+  validators: ValidationRule<T>[];
+  asyncValidators?: AsyncValidator<T>[];
+}
+
+// ✅ React component typing
+interface UserCardProps {
+  user: User;
+  onEdit: (user: User) => void;
+  onDelete: (id: number) => Promise<void>;
+  className?: string;
+  showActions?: boolean;
+}
+
+const UserCard: React.FC<UserCardProps> = ({
+  user,
+  onEdit,
+  onDelete,
+  className = '',
+  showActions = true,
+}) => {
+  const handleEdit = (): void => {
+    onEdit(user);
+  };
+
+  const handleDelete = async (): Promise<void> => {
+    try {
+      await onDelete(user.id);
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+    }
+  };
+
+  return (
+    <div className={className}>
+      <h3>{user.name}</h3>
+      <p>{user.email}</p>
+      {showActions && (
+        <div>
+          <button onClick={handleEdit}>Edit</button>
+          <button onClick={handleDelete}>Delete</button>
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+### API Client with Strong Typing
+```typescript
+// ✅ Typed API client
+class ApiClient {
+  private baseUrl: string;
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+  }
+
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json() as Promise<ApiResponse<T>>;
+  }
+
+  async getUsers(): Promise<ApiResponse<User[]>> {
+    return this.request<User[]>('/users');
+  }
+
+  async getUser(id: number): Promise<ApiResponse<User>> {
+    return this.request<User>(`/users/${id}`);
+  }
+
+  async createUser(userData: CreateUserRequest): Promise<ApiResponse<User>> {
+    return this.request<User>('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async updateUser(
+    id: number,
+    updates: Partial<User>
+  ): Promise<ApiResponse<User>> {
+    return this.request<User>(`/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+}
+
+// ✅ Usage with proper error handling
+const apiClient = new ApiClient('https://api.example.com');
+
+async function fetchUserData(userId: number): Promise<User | null> {
+  try {
+    const response = await apiClient.getUser(userId);
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Failed to fetch user:', error);
+    return null;
+  }
+}
+```
+
+### TypeScript Commands
+```powershell
+# Type checking
+npm run type-check
+# or
+npx tsc --noEmit
+
+# Type checking in watch mode
+npx tsc --noEmit --watch
+
+# Generate declaration files
+npx tsc --declaration --emitDeclarationOnly
+```
+
+## Common Type Safety Violations
+
+### Python Anti-patterns
+```python
+# ❌ Using Any everywhere
+def bad_function(data: Any) -> Any:
+    return data
+
+# ❌ Missing return type
+def process_data(users: List[Dict[str, str]]):
+    return users
+
+# ❌ Too generic typing
+def get_items() -> List:  # Should be List[SpecificType]
+    pass
+
+# ❌ Mixing typed and untyped code
+def typed_function(x: int) -> str:
+    return untyped_function(x)  # Calling untyped function
+
+def untyped_function(x):  # No types
+    return str(x)
+```
+
+### TypeScript Anti-patterns
+```typescript
+// ❌ Using 'any' everywhere
+function processData(data: any): any {
+  return data;
+}
+
+// ❌ Missing function return types
+function calculateTotal(items) {  // No parameter types
+  return items.reduce((sum, item) => sum + item.price, 0);  // No return type
+}
+
+// ❌ Weak typing
+interface WeakUser {
+  [key: string]: any;  // Too permissive
+}
+
+// ❌ Type assertions without validation
+const userData = response.data as User;  // Unsafe assertion
+```
+
+## CI/CD Type Checking
+
+### GitHub Actions
+```yaml
+name: Type Safety
+
+on: [push, pull_request]
+
+jobs:
+  python-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+      - name: Install dependencies
+        run: poetry install
+      - name: Type check with MyPy
+        run: poetry run mypy .
+
+  typescript-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npm run type-check
+```
+
+
+**Remember: Type safety catches errors at development time rather than runtime. Use strict type checking, comprehensive annotations, and integrate type checking into your development workflow and CI/CD pipeline.**

@@ -1,0 +1,443 @@
+---
+description: 
+globs: "**/*.py","**/*.js","**/*.ts","**/nginx/**","**/middleware/**","**/security/**","**/main.py","**/app.py","**/server.js","**/index.js"
+alwaysApply: false
+---
+---
+description: Enforce security headers, CORS configuration, and HTTPS best practices
+---
+
+# Security Headers & CORS Rule
+
+## Core Security Requirements
+**ALWAYS implement comprehensive security headers and proper CORS configuration.** Security must be configured before any API endpoints are exposed.
+
+## Required Security Headers
+
+### Mandatory HTTP Security Headers
+```http
+# Content Security Policy - Prevent XSS attacks
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; font-src 'self'; object-src 'none'; media-src 'self'; frame-src 'none';
+
+# Prevent clickjacking attacks
+X-Frame-Options: DENY
+
+# Prevent MIME type sniffing
+X-Content-Type-Options: nosniff
+
+# Enable XSS protection in browsers
+X-XSS-Protection: 1; mode=block
+
+# Force HTTPS connections
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# Control referrer information
+Referrer-Policy: strict-origin-when-cross-origin
+
+# Disable unnecessary features
+Permissions-Policy: geolocation=(), microphone=(), camera=()
+```
+
+## Backend Implementation (FastAPI/Python)
+
+### Security Middleware Configuration
+```python
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+import os
+
+app = FastAPI()
+
+# CORS Configuration
+CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
+CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,  # Never use ["*"] in production
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],  # Specific methods only
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+    ],
+    expose_headers=["X-Total-Count", "X-Page-Count"],
+)
+
+# Trusted Host Middleware (prevent Host header attacks)
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=[host.strip() for host in ALLOWED_HOSTS]
+)
+
+# Session middleware with secure settings
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv('SESSION_SECRET_KEY'),
+    max_age=3600,  # 1 hour
+    same_site='strict',
+    https_only=True if os.getenv('ENVIRONMENT') == 'production' else False
+)
+```
+
+### Security Headers Middleware
+```python
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Content Security Policy
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self'; "
+            "font-src 'self'; "
+            "object-src 'none'; "
+            "media-src 'self'; "
+            "frame-src 'none';"
+        )
+        
+        # Security headers
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        
+        # HTTPS enforcement (production only)
+        if os.getenv('ENVIRONMENT') == 'production':
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains; preload"
+            )
+        
+        # Remove server information
+        response.headers.pop("Server", None)
+        
+        return response
+
+# Add to FastAPI app
+app.add_middleware(SecurityHeadersMiddleware)
+```
+
+### CORS Configuration Examples
+```python
+# ✅ Development CORS (restrictive but functional)
+DEVELOPMENT_CORS = {
+    "allow_origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+    "allow_credentials": True,
+    "allow_methods": ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    "allow_headers": ["*"],
+}
+
+# ✅ Production CORS (highly restrictive)
+PRODUCTION_CORS = {
+    "allow_origins": ["https://yourdomain.com", "https://www.yourdomain.com"],
+    "allow_credentials": True,
+    "allow_methods": ["GET", "POST", "PUT", "DELETE"],
+    "allow_headers": [
+        "Accept",
+        "Accept-Language", 
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+    ],
+}
+
+# ❌ NEVER use in production
+INSECURE_CORS = {
+    "allow_origins": ["*"],  # NEVER DO THIS
+    "allow_credentials": True,  # This combination is forbidden
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+```
+
+## Frontend Security Configuration
+
+### Fetch API with Security Headers
+```typescript
+// utils/api.ts
+const API_BASE_URL = process.env.REACT_APP_API_URL;
+
+interface ApiConfig {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  headers?: Record<string, string>;
+  body?: any;
+  credentials?: 'include' | 'same-origin' | 'omit';
+}
+
+export async function apiRequest<T>(
+  endpoint: string,
+  config: ApiConfig = { method: 'GET' }
+): Promise<T> {
+  const url = `${API_BASE_URL}${endpoint}`;
+  
+  const defaultHeaders = {
+    'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',  // CSRF protection
+    ...config.headers,
+  };
+
+  const requestConfig: RequestInit = {
+    method: config.method,
+    headers: defaultHeaders,
+    credentials: 'include',  // Send cookies for authentication
+    mode: 'cors',
+    cache: 'no-cache',
+    ...config,
+  };
+
+  if (config.body && config.method !== 'GET') {
+    requestConfig.body = JSON.stringify(config.body);
+  }
+
+  const response = await fetch(url, requestConfig);
+  
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+```
+
+### Content Security Policy for React
+```html
+<!-- public/index.html -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' 'unsafe-eval';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+  connect-src 'self' https://api.yourdomain.com;
+  font-src 'self' https://fonts.gstatic.com;
+  object-src 'none';
+  media-src 'self';
+  frame-src 'none';
+">
+
+<meta http-equiv="X-Frame-Options" content="DENY">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+```
+
+## Nginx Configuration (Production)
+
+### Nginx Security Headers
+```nginx
+# nginx/nginx.conf
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com;
+
+    # SSL Configuration
+    ssl_certificate /etc/ssl/certs/yourdomain.com.crt;
+    ssl_certificate_key /etc/ssl/private/yourdomain.com.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Security Headers
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+    
+    # Content Security Policy
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; font-src 'self' https://fonts.gstatic.com; object-src 'none'; media-src 'self'; frame-src 'none';" always;
+
+    # Hide server information
+    server_tokens off;
+    
+    # CORS Headers (if handling CORS at nginx level)
+    add_header Access-Control-Allow-Origin "https://yourdomain.com" always;
+    add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Accept, Accept-Language, Content-Language, Content-Type, Authorization, X-Requested-With" always;
+    add_header Access-Control-Allow-Credentials "true" always;
+    
+    # Handle preflight requests
+    if ($request_method = 'OPTIONS') {
+        add_header Access-Control-Allow-Origin "https://yourdomain.com";
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS";
+        add_header Access-Control-Allow-Headers "Accept, Accept-Language, Content-Language, Content-Type, Authorization, X-Requested-With";
+        add_header Access-Control-Allow-Credentials "true";
+        add_header Access-Control-Max-Age 1728000;
+        add_header Content-Type "text/plain charset=UTF-8";
+        add_header Content-Length 0;
+        return 204;
+    }
+
+    # Backend API proxy
+    location /api/ {
+        proxy_pass http://backend:8000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Frontend static files
+    location / {
+        try_files $uri $uri/ /index.html;
+        root /usr/share/nginx/html;
+        
+        # Cache static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+}
+
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    server_name yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+## Security Testing & Validation
+
+### Security Headers Validation
+```python
+# tests/test_security.py
+import pytest
+from fastapi.testclient import TestClient
+from main import app
+
+client = TestClient(app)
+
+def test_security_headers():
+    """Test that all required security headers are present."""
+    response = client.get("/")
+    
+    # Required security headers
+    assert "X-Frame-Options" in response.headers
+    assert response.headers["X-Frame-Options"] == "DENY"
+    
+    assert "X-Content-Type-Options" in response.headers
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    
+    assert "X-XSS-Protection" in response.headers
+    assert response.headers["X-XSS-Protection"] == "1; mode=block"
+    
+    assert "Content-Security-Policy" in response.headers
+    assert "Referrer-Policy" in response.headers
+
+def test_cors_configuration():
+    """Test CORS configuration."""
+    headers = {"Origin": "http://localhost:3000"}
+    response = client.options("/api/health", headers=headers)
+    
+    assert response.status_code == 200
+    assert "Access-Control-Allow-Origin" in response.headers
+    assert response.headers["Access-Control-Allow-Origin"] in [
+        "http://localhost:3000", 
+        "https://yourdomain.com"
+    ]
+
+def test_https_redirect_production():
+    """Test HTTPS enforcement in production."""
+    if os.getenv('ENVIRONMENT') == 'production':
+        response = client.get("/", headers={"X-Forwarded-Proto": "http"})
+        assert response.status_code == 301  # Redirect to HTTPS
+```
+
+## Environment-Specific Configuration
+
+### Development Security (Relaxed but Safe)
+```python
+DEVELOPMENT_SECURITY = {
+    "cors_origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+    "https_only": False,
+    "csp_policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval';",  # Relaxed for hot reload
+    "allowed_hosts": ["localhost", "127.0.0.1"],
+}
+```
+
+### Production Security (Strict)
+```python
+PRODUCTION_SECURITY = {
+    "cors_origins": ["https://yourdomain.com"],
+    "https_only": True,
+    "csp_policy": "default-src 'self'; script-src 'self'; style-src 'self';",  # Strict
+    "allowed_hosts": ["yourdomain.com", "www.yourdomain.com"],
+    "hsts_max_age": 31536000,  # 1 year
+}
+```
+
+## Common Security Mistakes to Avoid
+
+### CORS Misconfigurations
+```python
+# ❌ NEVER DO THESE
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],           # Too permissive
+    allow_credentials=True,        # Dangerous with allow_origins=["*"]
+    allow_methods=["*"],           # Unnecessary exposure
+    allow_headers=["*"],           # Potential security risk
+)
+
+# ❌ Missing HTTPS enforcement in production
+# ❌ No input validation on Origin headers
+# ❌ Allowing file:// origins in production
+# ❌ Not handling preflight requests properly
+```
+
+### CSP Misconfigurations
+```http
+# ❌ Too permissive CSP
+Content-Security-Policy: default-src *; script-src * 'unsafe-inline' 'unsafe-eval';
+
+# ❌ Missing important directives
+Content-Security-Policy: default-src 'self';  # Missing script-src, style-src, etc.
+
+# ✅ Proper restrictive CSP
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;
+```
+
+## Monitoring and Alerting
+
+### Security Monitoring
+```python
+import logging
+
+security_logger = logging.getLogger('security')
+
+def log_security_event(event_type: str, details: dict):
+    """Log security-related events for monitoring."""
+    security_logger.warning(f"Security event: {event_type}", extra=details)
+
+# Monitor CORS violations
+@app.middleware("http")
+async def monitor_cors_violations(request: Request, call_next):
+    origin = request.headers.get('origin')
+    if origin and origin not in ALLOWED_ORIGINS:
+        log_security_event('cors_violation', {
+            'origin': origin,
+            'path': request.url.path,
+            'ip': request.client.host
+        })
+    
+    return await call_next(request)
+```
+
+
+**Remember: Security headers and CORS must be configured from the start. Never use permissive settings in production, always test security configurations, and monitor for violations.**

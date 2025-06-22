@@ -1,0 +1,533 @@
+---
+description: 
+globs: "**/*.js,**/*.ts,**/*.tsx,**/*.jsx,**/src/**,**/components/**,**/hooks/**,**/services/**,**/utils/**"
+alwaysApply: false
+---
+---
+description: Enforce Sentry-based error tracking and React error handling patterns
+---
+
+# Frontend Error Handling & Logging Rule (Sentry)
+
+## Core Requirements
+**ALWAYS use Sentry for error tracking and implement React error boundaries.** Ensure comprehensive frontend observability and user experience monitoring.
+
+## Sentry Configuration
+
+### Basic Setup
+```typescript
+// config/sentry.ts
+import * as Sentry from '@sentry/react';
+import { BrowserTracing } from '@sentry/tracing';
+
+Sentry.init({
+  dsn: process.env.REACT_APP_SENTRY_DSN,
+  environment: process.env.NODE_ENV,
+  release: process.env.REACT_APP_VERSION,
+  
+  // Performance monitoring
+  integrations: [
+    new BrowserTracing({
+      tracePropagationTargets: ['localhost', process.env.REACT_APP_API_URL || ''],
+    }),
+  ],
+  
+  // Sample rates
+  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  sampleRate: 1.0,
+  
+  // Filter noise in production
+  beforeSend(event, hint) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Sentry Event:', event, hint);
+      return null; // Don't send in development
+    }
+    
+    // Filter non-actionable errors
+    if (event.exception) {
+      const error = hint.originalException;
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch') || 
+            error.message.includes('NetworkError')) {
+          return null;
+        }
+      }
+    }
+    
+    return event;
+  },
+  
+  autoSessionTracking: true,
+  maxBreadcrumbs: 50,
+});
+
+// Helper functions
+export const setSentryUser = (user: { id: string; email: string }) => {
+  Sentry.setUser({ id: user.id, email: user.email });
+};
+
+export const reportError = (error: Error, context?: Record<string, any>) => {
+  Sentry.withScope((scope) => {
+    if (context) {
+      Object.keys(context).forEach((key) => {
+        scope.setTag(key, context[key]);
+      });
+    }
+    Sentry.captureException(error);
+  });
+};
+```
+
+### Package Dependencies
+```json
+{
+  "dependencies": {
+    "@sentry/react": "^7.80.0",
+    "@sentry/tracing": "^7.80.0"
+  }
+}
+```
+
+## React Error Boundaries
+
+### Error Boundary Component
+```typescript
+// components/ErrorBoundary.tsx
+import React, { Component, ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
+
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+}
+
+interface State {
+  hasError: boolean;
+  eventId?: string;
+}
+
+class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Log to console in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error('React Error Boundary:', error, errorInfo);
+    }
+
+    // Send to Sentry
+    const eventId = Sentry.captureException(error, {
+      contexts: { react: { componentStack: errorInfo.componentStack } },
+    });
+
+    this.setState({ eventId });
+    this.props.onError?.(error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        this.props.fallback || (
+          <div className="error-fallback">
+            <h2>Something went wrong</h2>
+            <p>We've been notified and are working to fix this issue.</p>
+            <button onClick={() => this.setState({ hasError: false })}>
+              Try again
+            </button>
+          </div>
+        )
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default ErrorBoundary;
+```
+
+### App Integration
+```typescript
+// App.tsx
+import ErrorBoundary from './components/ErrorBoundary';
+import * as Sentry from '@sentry/react';
+
+const App = () => {
+  return (
+    <Sentry.Profiler name="App">
+      <ErrorBoundary>
+        {/* Your app components */}
+      </ErrorBoundary>
+    </Sentry.Profiler>
+  );
+};
+
+export default App;
+```
+
+## Frontend Logging Service
+
+### Logger Implementation
+```typescript
+// services/logger.ts
+import * as Sentry from '@sentry/react';
+
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+class Logger {
+  private isDevelopment = process.env.NODE_ENV === 'development';
+
+  debug(message: string, context?: Record<string, any>) {
+    if (this.isDevelopment) {
+      console.debug(message, context);
+    }
+    
+    Sentry.addBreadcrumb({
+      message,
+      level: 'debug',
+      data: context,
+    });
+  }
+
+  info(message: string, context?: Record<string, any>) {
+    if (this.isDevelopment) {
+      console.info(message, context);
+    }
+    
+    Sentry.addBreadcrumb({
+      message,
+      level: 'info',
+      data: context,
+    });
+  }
+
+  warn(message: string, context?: Record<string, any>) {
+    console.warn(message, context);
+    
+    Sentry.withScope((scope) => {
+      scope.setLevel('warning');
+      if (context) {
+        Object.entries(context).forEach(([key, value]) => {
+          scope.setTag(key, String(value));
+        });
+      }
+      Sentry.captureMessage(message);
+    });
+  }
+
+  error(message: string, context?: Record<string, any>, error?: Error) {
+    console.error(message, context);
+    
+    Sentry.withScope((scope) => {
+      scope.setLevel('error');
+      if (context) {
+        Object.entries(context).forEach(([key, value]) => {
+          scope.setTag(key, String(value));
+        });
+      }
+      
+      if (error) {
+        Sentry.captureException(error);
+      } else {
+        Sentry.captureMessage(message);
+      }
+    });
+  }
+
+  // User action tracking
+  logUserAction(action: string, context?: Record<string, any>) {
+    this.info(`User action: ${action}`, {
+      event_type: 'user_action',
+      action,
+      ...context,
+    });
+
+    Sentry.addBreadcrumb({
+      message: `User action: ${action}`,
+      category: 'user',
+      level: 'info',
+      data: context,
+    });
+  }
+
+  // Performance tracking
+  logPerformance(operation: string, duration: number, context?: Record<string, any>) {
+    this.info(`Performance: ${operation}`, {
+      event_type: 'performance',
+      operation,
+      duration_ms: duration,
+      ...context,
+    });
+  }
+}
+
+export const logger = new Logger();
+```
+
+## API Error Handling
+
+### API Client with Error Tracking
+```typescript
+// services/api.ts
+import { logger } from './logger';
+import * as Sentry from '@sentry/react';
+
+interface ApiError {
+  message: string;
+  code?: string;
+  status?: number;
+}
+
+class ApiClient {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const startTime = Date.now();
+    const url = `${process.env.REACT_APP_API_URL}${endpoint}`;
+    
+    const transaction = Sentry.startTransaction({
+      name: `API: ${options.method || 'GET'} ${endpoint}`,
+      op: 'http.client',
+    });
+
+    try {
+      const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+        ...options,
+      });
+
+      const duration = Date.now() - startTime;
+      
+      logger.logPerformance(`API: ${endpoint}`, duration, {
+        method: options.method || 'GET',
+        status: response.status,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        
+        const apiError: ApiError = {
+          message: errorData.message || `HTTP ${response.status}`,
+          code: errorData.error || 'API_ERROR',
+          status: response.status,
+        };
+
+        logger.error('API request failed', {
+          endpoint,
+          method: options.method || 'GET',
+          status: response.status,
+          duration,
+        });
+
+        transaction.setStatus('internal_error');
+        throw new Error(apiError.message);
+      }
+
+      transaction.setStatus('ok');
+      return response.json();
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error('API request error', {
+        endpoint,
+        method: options.method || 'GET',
+        duration,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }, error instanceof Error ? error : undefined);
+      
+      transaction.setStatus('internal_error');
+      throw error;
+    } finally {
+      transaction.finish();
+    }
+  }
+
+  async get<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, { method: 'GET' });
+  }
+
+  async post<T>(endpoint: string, data: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+}
+
+export const apiClient = new ApiClient();
+```
+
+## Custom Hooks
+
+### Error Handling Hook
+```typescript
+// hooks/useErrorHandler.ts
+import { useCallback } from 'react';
+import { logger } from '../services/logger';
+
+export const useErrorHandler = () => {
+  const handleError = useCallback((error: Error, context?: Record<string, any>) => {
+    logger.error('Component error', context, error);
+  }, []);
+
+  const handleAsyncError = useCallback(
+    async <T>(
+      operation: () => Promise<T>,
+      context?: Record<string, any>
+    ): Promise<T | null> => {
+      try {
+        return await operation();
+      } catch (error) {
+        handleError(error as Error, context);
+        return null;
+      }
+    },
+    [handleError]
+  );
+
+  return { handleError, handleAsyncError };
+};
+
+// Usage example
+const UserComponent = () => {
+  const { handleAsyncError } = useErrorHandler();
+
+  const handleSubmit = async (data: FormData) => {
+    const result = await handleAsyncError(
+      () => apiClient.createUser(data),
+      { operation: 'create_user' }
+    );
+    
+    if (result) {
+      // Handle success
+      logger.logUserAction('user_created', { method: 'form' });
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* Form fields */}
+    </form>
+  );
+};
+```
+
+### Performance Hook
+```typescript
+// hooks/usePerformanceTracking.ts
+import { useEffect, useRef } from 'react';
+import { logger } from '../services/logger';
+
+export const usePerformanceTracking = (componentName: string) => {
+  const startTime = useRef<number>();
+
+  useEffect(() => {
+    startTime.current = Date.now();
+    
+    return () => {
+      if (startTime.current) {
+        const duration = Date.now() - startTime.current;
+        logger.logPerformance(`Component: ${componentName}`, duration);
+      }
+    };
+  }, [componentName]);
+};
+
+// Usage
+const ExpensiveComponent = () => {
+  usePerformanceTracking('ExpensiveComponent');
+  
+  return <div>{/* Component content */}</div>;
+};
+```
+
+## Route Tracking
+
+### Navigation Monitoring
+```typescript
+// components/RouteTracker.tsx
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import * as Sentry from '@sentry/react';
+import { logger } from '../services/logger';
+
+export const RouteTracker = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    // Track page views
+    logger.logUserAction('page_view', {
+      pathname: location.pathname,
+      search: location.search,
+    });
+
+    Sentry.addBreadcrumb({
+      message: `Page view: ${location.pathname}`,
+      category: 'navigation',
+      level: 'info',
+      data: { pathname: location.pathname, search: location.search },
+    });
+  }, [location]);
+
+  return null;
+};
+
+// Add to your Router
+<Router>
+  <RouteTracker />
+  {/* Your routes */}
+</Router>
+```
+
+## Environment Variables
+
+### Required .env variables
+```bash
+# .env.example
+REACT_APP_SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+REACT_APP_VERSION=1.0.0
+REACT_APP_API_URL=http://localhost:8000
+```
+
+## Common Anti-patterns
+
+### Frontend Logging Violations
+```typescript
+// ❌ Wrong - Poor error handling
+try {
+  await apiCall();
+} catch (error) {
+  console.log(error); // Use proper logger
+}
+
+// ❌ Wrong - No error boundaries
+const App = () => <Component />; // No error boundary
+
+// ❌ Wrong - Silent failures
+const handleClick = async () => {
+  try {
+    await riskyOperation();
+  } catch {
+    // Silent failure - user has no feedback
+  }
+};
+
+// ❌ Wrong - Logging sensitive data
+logger.info('User login', { password: userPassword }); // Don't log secrets
+
+// ✅ Correct - Follow patterns above with:
+// - Error boundaries around components
+// - Proper error logging with context
+// - User action tracking
+// - Performance monitoring
+```
+
+
+**Remember: Frontend error tracking provides crucial insights into user experience issues. Use Sentry for comprehensive error monitoring, implement error boundaries for graceful failures, and track user interactions for better product insights.**

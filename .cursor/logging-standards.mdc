@@ -1,0 +1,36 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Error Handling & Logging Overview
+
+## Important Note
+**This rule has been split into two focused rules for better maintainability:**
+
+1. **Backend Error Handling & Logging Rule (Loguru)** - For Python/FastAPI backend logging and error handling
+2. **Frontend Error Handling & Logging Rule (Sentry)** - For React/TypeScript frontend error tracking
+
+## Quick Reference
+
+### Backend (Python/FastAPI)
+- Use **Loguru** for structured logging
+- Implement custom exception classes
+- Add request/response middleware logging
+- Include performance and security event tracking
+
+### Frontend (React/TypeScript)  
+- Use **Sentry** for error tracking and performance monitoring
+- Implement React Error Boundaries
+- Add API call logging with performance metrics
+- Track user actions and page views
+
+## Integration
+Both systems work together to provide full-stack observability:
+- Backend logs structured JSON events
+- Frontend sends errors and performance data to Sentry  
+- Both integrate with monitoring dashboards
+- Consistent error correlation across the stack
+
+
+**Refer to the individual focused rules for detailed implementation patterns and code examples.**

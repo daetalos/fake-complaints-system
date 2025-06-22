@@ -1,0 +1,188 @@
+---
+description: 
+globs: "**/Makefile,**/makefile,**/Makefile.*,**/*.mk,**/README.md,**/CONTRIBUTING.md,**/docs/**,**/scripts/**"
+alwaysApply: false
+---
+---
+description: Enforce Makefile presence for standardized development workflow management
+---
+
+# Makefile Development Management Rule
+
+## Core Requirements
+**ALWAYS include a Makefile in the project root to standardize development workflows.** The Makefile must provide consistent commands for setup, development, testing, and deployment across all environments.
+
+## Required Makefile Structure
+
+### Essential Makefile Template
+```makefile
+# Makefile for Project Development
+.PHONY: help install setup dev stop test lint format build clean migrate
+
+# Default target
+.DEFAULT_GOAL := help
+
+# Variables
+DOCKER_COMPOSE := docker-compose
+POETRY := poetry
+
+# Colors
+GREEN := \033[32m
+BLUE := \033[34m
+RESET := \033[0m
+
+## help: Show available commands
+help:
+	@echo "$(BLUE)Available commands:$(RESET)"
+	@grep -E '^## [a-zA-Z_-]+:.*$' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ": "}; {printf "  $(GREEN)%-12s$(RESET) %s\n", $1, $2}' | \
+		sed 's/## //'
+
+## install: Install all dependencies
+install:
+	@echo "$(BLUE)Installing dependencies...$(RESET)"
+	$(POETRY) install
+	cd frontend && npm ci
+	$(POETRY) run pre-commit install
+	@if [ ! -f .env ]; then cp .env.example .env; fi
+	@echo "$(GREEN)✅ Installation complete$(RESET)"
+
+## setup: First-time project setup
+setup: install
+	@echo "$(BLUE)Building Docker images...$(RESET)"
+	$(DOCKER_COMPOSE) build
+	@echo "$(GREEN)🎉 Setup complete! Run 'make dev' to start$(RESET)"
+
+## dev: Start development environment
+dev:
+	@echo "$(BLUE)Starting development...$(RESET)"
+	$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+## stop: Stop development environment
+stop:
+	$(DOCKER_COMPOSE) down
+
+## test: Run all tests
+test:
+	@echo "$(BLUE)Running tests...$(RESET)"
+	$(POETRY) run pytest
+	cd frontend && npm test
+
+## lint: Run linting
+lint:
+	@echo "$(BLUE)Running linting...$(RESET)"
+	$(POETRY) run flake8 .
+	$(POETRY) run mypy .
+	cd frontend && npm run lint
+
+## format: Format code
+format:
+	@echo "$(BLUE)Formatting code...$(RESET)"
+	$(POETRY) run black .
+	$(POETRY) run isort .
+	cd frontend && npm run format
+
+## check: Run formatting and linting
+check: format lint
+	@echo "$(GREEN)✅ Quality checks complete$(RESET)"
+
+## build: Build for production
+build:
+	@echo "$(BLUE)Building...$(RESET)"
+	$(DOCKER_COMPOSE) build
+	cd frontend && npm run build
+
+## migrate: Run database migrations
+migrate:
+	$(POETRY) run alembic upgrade head
+
+## clean: Clean temporary files
+clean:
+	@echo "$(BLUE)Cleaning...$(RESET)"
+	find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+	find . -name "*.pyc" -delete 2>/dev/null || true
+	find . -name ".pytest_cache" -type d -exec rm -rf {} + 2>/dev/null || true
+	rm -rf htmlcov/ .coverage 2>/dev/null || true
+	@echo "$(GREEN)✅ Cleanup complete$(RESET)"
+
+## logs: Show service logs
+logs:
+	$(DOCKER_COMPOSE) logs -f
+```
+
+## Windows PowerShell Support
+
+### For Windows users without Make
+```powershell
+# Simple PowerShell wrapper (make.ps1)
+param([string]$Target = "help")
+
+switch ($Target) {
+    "install" { poetry install; cd frontend; npm ci; cd ..; poetry run pre-commit install }
+    "dev" { docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d }
+    "test" { poetry run pytest; cd frontend; npm test; cd .. }
+    "format" { poetry run black .; poetry run isort .; cd frontend; npm run format; cd .. }
+    "lint" { poetry run flake8 .; cd frontend; npm run lint; cd .. }
+    "stop" { docker-compose down }
+    default { Write-Host "Available: install, dev, test, format, lint, stop" }
+}
+```
+
+## README.md Documentation Requirements
+
+### Required in README.md:
+```markdown
+## Development Setup
+
+### Quick Start
+```bash
+# First-time setup
+make setup
+
+# Start development
+make dev
+
+# Run tests
+make test
+```
+
+### Available Commands
+- `make help` - Show all available commands
+- `make install` - Install dependencies
+- `make dev` - Start development environment
+- `make stop` - Stop development environment
+- `make test` - Run tests
+- `make lint` - Run linting
+- `make format` - Format code
+- `make check` - Run format + lint
+- `make build` - Build for production
+- `make migrate` - Run database migrations
+- `make clean` - Clean temporary files
+
+Windows users: Use `.\make.ps1 <command>` instead of `make <command>`.
+```
+
+## Common Anti-patterns to Avoid
+
+### Makefile Requirements
+```makefile
+# ❌ Wrong - No help target or inconsistent commands
+test:
+	python -m pytest  # Should use poetry run
+
+format:
+	black .  # Should use poetry run
+
+# ❌ Wrong - No integration with project tools
+dev:
+	python manage.py runserver  # Should use docker-compose
+
+# ✅ Correct - Follow the streamlined template above with:
+# - Help system (make help)
+# - Integration with Poetry, Docker, npm
+# - Consistent command naming
+# - Basic error handling
+```
+
+
+**Remember: A focused Makefile eliminates confusion and provides a consistent interface for essential development tasks. Keep it simple but comprehensive for daily workflows.**

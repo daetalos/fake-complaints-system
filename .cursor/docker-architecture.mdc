@@ -1,0 +1,428 @@
+---
+description: 
+globs: "**/Dockerfile*","**/docker-compose*.yml","**/docker-compose*.yaml","**/.dockerignore","**/deployment/**","**/scripts/**","**/*.md"
+alwaysApply: false
+---
+---
+description: Enforce Docker containerization with organized structure - Dockerfiles in service directories, docker-compose at root
+---
+
+# Docker Architecture Rule
+
+## Core Requirement
+**ALWAYS use Docker for containerization.** Organize Dockerfiles in service-specific directories with docker-compose.yml at the project root for orchestration.
+
+## Project Structure Standard
+
+### Required Directory Structure
+```
+project-root/
+├── docker-compose.yml          # Main orchestration file (REQUIRED AT ROOT)
+├── docker-compose.dev.yml      # Development overrides (optional)
+├── docker-compose.prod.yml     # Production overrides (optional)
+├── .env                        # Environment variables
+├── backend/
+│   ├── Dockerfile              # Backend container definition
+│   ├── .dockerignore          # Backend-specific ignore rules
+│   ├── pyproject.toml         # Poetry dependencies
+│   └── src/
+├── frontend/
+│   ├── Dockerfile              # Frontend container definition
+│   ├── .dockerignore          # Frontend-specific ignore rules
+│   ├── package.json           # Node dependencies
+│   └── src/
+├── database/
+│   ├── Dockerfile              # Custom database setup (if needed)
+│   ├── init.sql               # Database initialization
+│   └── scripts/
+└── nginx/                      # Reverse proxy (if needed)
+    ├── Dockerfile
+    └── nginx.conf
+```
+
+## Containerization Standards
+
+### Never Use These Alternatives
+- ❌ Virtual machines without Docker
+- ❌ Direct host deployment
+- ❌ Heroku buildpacks (prefer Docker deployment)
+- ❌ Serverless without containerization
+- ❌ Manual service management
+
+### Always Use Docker For
+- ✅ Application services (backend, frontend, APIs)
+- ✅ Database services (PostgreSQL, MongoDB, Redis)
+- ✅ Message queues (RabbitMQ, Apache Kafka)
+- ✅ Reverse proxies (Nginx, Traefik)
+- ✅ Development environments
+- ✅ CI/CD pipelines
+- ✅ Production deployments
+
+## Service-Specific Dockerfile Examples
+
+### Backend Dockerfile (backend/Dockerfile)
+```dockerfile
+FROM python:3.11-slim
+
+# Install Poetry
+RUN pip install poetry
+
+# Configure Poetry
+ENV POETRY_NO_INTERACTION=1 \
+    POETRY_VENV_IN_PROJECT=1 \
+    POETRY_CACHE_DIR=/tmp/poetry_cache
+
+WORKDIR /app
+
+# Copy Poetry files
+COPY pyproject.toml poetry.lock ./
+
+# Install dependencies
+RUN poetry install --only=main && rm -rf $POETRY_CACHE_DIR
+
+# Copy application code
+COPY . .
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+EXPOSE 8000
+
+CMD ["poetry", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### Frontend Dockerfile (frontend/Dockerfile)
+```dockerfile
+# Multi-stage build for production
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY . .
+
+# Build application
+RUN npm run build
+
+# Production stage
+FROM nginx:alpine
+
+# Copy built files
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Database Dockerfile (database/Dockerfile) - If Custom Setup Needed
+```dockerfile
+FROM postgres:15
+
+# Copy initialization scripts
+COPY init.sql /docker-entrypoint-initdb.d/
+
+# Copy custom configuration
+COPY postgresql.conf /etc/postgresql/postgresql.conf
+
+EXPOSE 5432
+```
+
+## Root docker-compose.yml Structure
+
+### Development Configuration
+```yaml
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@database:5432/dbname
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./backend:/app
+      - backend_venv:/app/.venv
+    depends_on:
+      - database
+      - redis
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  database:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: dbname
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_venv:
+
+networks:
+  app-network:
+    driver: bridge
+```
+
+## Environment-Specific Overrides
+
+### docker-compose.dev.yml (Development Overrides)
+```yaml
+version: '3.8'
+
+services:
+  backend:
+    command: poetry run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+
+  frontend:
+    command: npm run dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  database:
+    environment:
+      - POSTGRES_PASSWORD=dev_password
+```
+
+### docker-compose.prod.yml (Production Overrides)
+```yaml
+version: '3.8'
+
+services:
+  backend:
+    restart: unless-stopped
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=info
+    volumes: []  # No volume mounts in production
+
+  frontend:
+    restart: unless-stopped
+    volumes: []
+
+  database:
+    restart: unless-stopped
+    environment:
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+    secrets:
+      - db_password
+
+secrets:
+  db_password:
+    external: true
+```
+
+## .dockerignore Files
+
+### Backend .dockerignore
+```
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+.venv/
+.git/
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+.pytest_cache/
+.coverage
+tests/
+```
+
+### Frontend .dockerignore
+```
+node_modules/
+npm-debug.log*
+.git/
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+dist/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+```
+
+## Common Docker Commands
+
+### Development Workflow
+```powershell
+# Start all services
+docker-compose up -d
+
+# Start with development overrides
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# View logs
+docker-compose logs -f backend
+
+# Execute commands in containers
+docker-compose exec backend poetry run pytest
+docker-compose exec frontend npm test
+
+# Rebuild specific service
+docker-compose build backend
+
+# Stop all services
+docker-compose down
+
+# Remove volumes (reset data)
+docker-compose down -v
+```
+
+### Production Deployment
+```powershell
+# Production deployment
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# Update services
+docker-compose pull
+docker-compose up -d --no-deps backend frontend
+
+# Backup volumes
+docker run --rm -v project_postgres_data:/data -v ${PWD}:/backup alpine tar czf /backup/backup.tar.gz -C /data .
+```
+
+## Service Communication
+
+### Internal Networking
+- Services communicate using service names as hostnames
+- Backend connects to `database:5432` not `localhost:5432`
+- Frontend API calls go to `http://backend:8000` internally
+
+### Environment Variables for Service Discovery
+```yaml
+services:
+  backend:
+    environment:
+      - DATABASE_HOST=database
+      - DATABASE_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+```
+
+## Health Checks and Monitoring
+
+### Service Health Checks
+```yaml
+services:
+  backend:
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  database:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d dbname"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+## CI/CD Integration
+
+### GitHub Actions Example
+```yaml
+- name: Build and test with Docker
+  run: |
+    docker-compose -f docker-compose.yml -f docker-compose.dev.yml build
+    docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+    docker-compose exec -T backend poetry run pytest
+    docker-compose down
+```
+
+## Documentation Standards
+
+When creating documentation:
+- Always reference Docker commands for setup
+- Include docker-compose.yml examples
+- Document service dependencies and networking
+- Provide both development and production deployment instructions
+- Include troubleshooting for common Docker issues
+
+## Migration from Non-Docker Setups
+
+If encountering non-containerized applications:
+1. Create appropriate Dockerfiles in service directories
+2. Create root-level docker-compose.yml
+3. Update documentation to use Docker commands
+4. Convert environment setup to Docker environment variables
+5. Update CI/CD to use Docker builds
+
+
+**Remember: All applications must be containerized with Docker. Use the specified directory structure with service-specific Dockerfiles and root-level docker-compose orchestration.**

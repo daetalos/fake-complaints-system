@@ -1,0 +1,386 @@
+---
+description: 
+globs: "**/*.py,**/*.js,**/*.ts,**/*.tsx,**/pyproject.toml,**/package.json,**/.eslintrc*,**/.prettierrc*,**/.flake8,**/.pre-commit-config.yaml"
+alwaysApply: false
+---
+---
+description: Enforce consistent code formatting and linting across Python and TypeScript/JavaScript
+---
+
+# Linting & Formatting Rule
+
+## Core Requirements
+**ALWAYS maintain consistent code formatting and linting standards.** Automated formatting and linting must be configured before writing significant code.
+
+## Python Formatting & Linting
+
+### Required Tools Configuration
+```toml
+# pyproject.toml
+[tool.poetry.group.dev.dependencies]
+black = "^23.0.0"
+isort = "^5.12.0"
+flake8 = "^6.1.0"
+pre-commit = "^3.5.0"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  \.eggs
+  | \.git
+  | \.mypy_cache
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["app", "backend"]
+known_third_party = ["fastapi", "sqlalchemy", "pydantic"]
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+exclude = [".git", "__pycache__", "build", "dist", ".venv"]
+per-file-ignores = [
+    "__init__.py:F401"
+]
+```
+
+### Python Formatting Commands
+```powershell
+# Format code
+poetry run black .
+poetry run isort .
+
+# Check formatting without changes
+poetry run black --check .
+poetry run isort --check-only .
+
+# Lint code
+poetry run flake8 .
+
+# All formatting and linting
+poetry run black . && poetry run isort . && poetry run flake8 .
+```
+
+### Python Code Style Examples
+```python
+# ✅ Correct - Black formatted
+from typing import Dict, List, Optional
+
+def process_user_data(
+    users: List[Dict[str, str]], 
+    filter_active: bool = True
+) -> List[Dict[str, str]]:
+    """Process user data with proper formatting."""
+    result = []
+    for user in users:
+        if filter_active and user.get("status") == "active":
+            result.append({
+                "name": user["name"],
+                "email": user["email"],
+                "status": user["status"],
+            })
+    return result
+
+# ❌ Wrong - Inconsistent formatting
+def process_user_data(users,filter_active=True):
+    result=[]
+    for user in users:
+        if filter_active and user.get('status')=='active':
+            result.append({'name':user['name'],'email':user['email']})
+    return result
+```
+
+## TypeScript/JavaScript Formatting & Linting
+
+### Package Configuration
+```json
+{
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-react": "^7.33.0",
+    "prettier": "^3.0.0"
+  },
+  "scripts": {
+    "lint": "eslint src --ext .ts,.tsx,.js,.jsx",
+    "lint:fix": "eslint src --ext .ts,.tsx,.js,.jsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
+  }
+}
+```
+
+### ESLint Configuration
+```json
+{
+  "extends": [
+    "eslint:recommended",
+    "@typescript-eslint/recommended",
+    "plugin:react/recommended",
+    "prettier"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "prefer-const": "error",
+    "no-var": "error",
+    "react/react-in-jsx-scope": "off"
+  }
+}
+```
+
+### Prettier Configuration
+```json
+{
+  "semi": true,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 80,
+  "tabWidth": 2,
+  "useTabs": false
+}
+```
+
+### Frontend Formatting Commands
+```powershell
+# Format code
+npm run format
+
+# Check formatting
+npm run format:check
+
+# Lint code
+npm run lint
+
+# Fix linting issues
+npm run lint:fix
+
+# All checks
+npm run format:check && npm run lint
+```
+
+### Frontend Code Style Examples
+```typescript
+// ✅ Correct - Prettier formatted
+interface UserData {
+  id: number;
+  name: string;
+  email: string;
+  isActive: boolean;
+}
+
+const processUsers = (users: UserData[]): UserData[] => {
+  return users.filter((user) => user.isActive).map((user) => ({
+    ...user,
+    name: user.name.trim(),
+  }));
+};
+
+// ❌ Wrong - Inconsistent formatting
+interface UserData{
+id:number,name:string,email:string,isActive:boolean}
+
+const processUsers=(users:UserData[])=>{
+return users.filter(user=>user.isActive).map(user=>({...user,name:user.name.trim()}))
+}
+```
+
+## Pre-commit Hook Configuration
+
+### Pre-commit Setup
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/psf/black
+    rev: 23.3.0
+    hooks:
+      - id: black
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.0.0
+    hooks:
+      - id: flake8
+
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v8.50.0
+    hooks:
+      - id: eslint
+        files: \.(js|jsx|ts|tsx)$
+        additional_dependencies:
+          - eslint@8.50.0
+          - '@typescript-eslint/parser@6.0.0'
+          - '@typescript-eslint/eslint-plugin@6.0.0'
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.0.3
+    hooks:
+      - id: prettier
+        files: \.(js|jsx|ts|tsx|json|css|md)$
+```
+
+### Pre-commit Installation
+```powershell
+# Install pre-commit
+poetry add --group dev pre-commit
+
+# Install hooks
+poetry run pre-commit install
+
+# Run on all files
+poetry run pre-commit run --all-files
+
+# Update hooks
+poetry run pre-commit autoupdate
+```
+
+## IDE Configuration
+
+### VS Code Settings
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": true,
+    "source.fixAll.eslint": true
+  },
+  "python.formatting.provider": "black",
+  "python.linting.enabled": true,
+  "python.linting.flake8Enabled": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  }
+}
+```
+
+## Docker Integration
+
+### Dockerfile with Formatting Checks
+```dockerfile
+FROM python:3.11-slim
+
+RUN pip install poetry
+
+WORKDIR /app
+COPY pyproject.toml poetry.lock ./
+RUN poetry install
+
+COPY . .
+
+# Formatting and linting checks during build
+RUN poetry run black --check . && \
+    poetry run isort --check-only . && \
+    poetry run flake8 .
+
+# Remove dev dependencies for production
+RUN poetry install --only=main
+
+CMD ["poetry", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+## Forbidden Formatting Patterns
+
+### Python Anti-patterns
+```python
+# ❌ Inconsistent quotes
+mixed_quotes = "single" + 'double'  # Use consistent quotes
+
+# ❌ Long lines
+very_long_function_call_that_exceeds_line_length_limit(param1, param2, param3, param4, param5)
+
+# ❌ Poor spacing
+result=function(arg1,arg2,arg3)  # No spaces around operators/commas
+
+# ❌ Inconsistent indentation
+if condition:
+  return True  # 2 spaces
+    return False  # 4 spaces (mixed)
+```
+
+### Frontend Anti-patterns
+```typescript
+// ❌ Inconsistent semicolons
+const a = 1;
+const b = 2  // Missing semicolon
+
+// ❌ Inconsistent quotes
+const message = "Hello" + 'World';  // Mixed quotes
+
+// ❌ Poor spacing
+const result=func(a,b,c);  // No spaces
+
+// ❌ Inconsistent trailing commas
+const obj = {
+  a: 1,
+  b: 2,  // Trailing comma
+  c: 3   // No trailing comma
+};
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+```yaml
+name: Code Quality
+
+on: [push, pull_request]
+
+jobs:
+  python-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+      - name: Install dependencies
+        run: poetry install
+      - name: Check formatting
+        run: |
+          poetry run black --check .
+          poetry run isort --check-only .
+          poetry run flake8 .
+
+  frontend-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm ci
+      - name: Check formatting
+        run: |
+          npm run format:check
+          npm run lint
+```
+
+
+**Remember: Consistent formatting eliminates style debates and improves code readability. Set up automated formatting and linting before writing significant code, and enforce it through pre-commit hooks and CI/CD.**

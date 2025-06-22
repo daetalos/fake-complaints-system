@@ -1,0 +1,257 @@
+---
+description: 
+globs: "backend/**/*.py", "**/pyproject.toml", "**/poetry.lock", "backend/**/requirements*.txt", "**/Dockerfile", "**/docker-compose*.yml", "**/*.md"
+alwaysApply: false
+---
+---
+description: Enforce Poetry for all Python dependency management in backend projects
+---
+
+# Poetry Dependency Management Rule
+
+## Core Requirement
+**ALWAYS use Poetry for Python dependency management in backend projects.** Do not use pip, pipenv, conda, or other package managers unless explicitly requested.
+
+## Command Replacements
+
+### Package Installation
+- ❌ `pip install package` → ✅ `poetry add package`
+- ❌ `pip install package==1.2.3` → ✅ `poetry add package@1.2.3`
+- ❌ `pip install -r requirements.txt` → ✅ `poetry install`
+- ❌ `pip install --dev package` → ✅ `poetry add --group dev package`
+- ❌ `pip install -e .` → ✅ `poetry install`
+
+### Development Dependencies
+- ❌ `pip install pytest` → ✅ `poetry add --group dev pytest`
+- ❌ `pip install black flake8 mypy` → ✅ `poetry add --group dev black flake8 mypy`
+- ❌ `pip install -r requirements-dev.txt` → ✅ `poetry install --with dev`
+
+### Package Removal
+- ❌ `pip uninstall package` → ✅ `poetry remove package`
+- ❌ `pip uninstall -r requirements.txt` → ✅ `poetry remove package1 package2`
+
+### Environment Management
+- ❌ `python -m venv venv` → ✅ `poetry shell` (or Poetry handles automatically)
+- ❌ `source venv/bin/activate` → ✅ `poetry shell`
+- ❌ `deactivate` → ✅ `exit` (from poetry shell)
+- ❌ `pip freeze > requirements.txt` → ✅ `poetry export -f requirements.txt --output requirements.txt` (if needed)
+
+### Running Commands
+- ❌ `python script.py` → ✅ `poetry run python script.py`
+- ❌ `pytest` → ✅ `poetry run pytest`
+- ❌ `black .` → ✅ `poetry run black .`
+- ❌ `uvicorn main:app` → ✅ `poetry run uvicorn main:app`
+
+### Project Initialization
+- ❌ `pip init` → ✅ `poetry new project-name` or `poetry init`
+- ❌ Creating requirements.txt → ✅ Use pyproject.toml (managed by Poetry)
+
+## File Structure Expectations
+
+### Required Files
+- `pyproject.toml` - Main dependency configuration (NOT requirements.txt)
+- `poetry.lock` - Lock file for reproducible installs
+- ❌ Avoid: `requirements.txt`, `requirements-dev.txt`, `Pipfile`, `environment.yml`
+
+### pyproject.toml Structure
+```toml
+[tool.poetry]
+name = "backend-project"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "^0.104.0"
+uvicorn = "^0.24.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+black = "^23.0.0"
+flake8 = "^6.1.0"
+mypy = "^1.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+```
+
+## Common Poetry Commands for Backend Development
+
+### Daily Workflow
+```powershell
+# Install all dependencies (including dev)
+poetry install
+
+# Install only production dependencies
+poetry install --only main
+
+# Add a new dependency
+poetry add fastapi sqlalchemy
+
+# Add development dependency
+poetry add --group dev pytest black
+
+# Update dependencies
+poetry update
+
+# Show installed packages
+poetry show
+
+# Check for dependency issues
+poetry check
+```
+
+### Backend-Specific Examples
+```powershell
+# Web framework dependencies
+poetry add fastapi uvicorn
+
+# Database dependencies
+poetry add sqlalchemy alembic psycopg2-binary
+
+# Development tools
+poetry add --group dev pytest pytest-asyncio black flake8 mypy
+
+# Run the backend server
+poetry run uvicorn main:app --reload
+
+# Run tests
+poetry run pytest
+
+# Database migrations
+poetry run alembic upgrade head
+```
+
+## Docker Integration
+
+### Dockerfile with Poetry
+```dockerfile
+FROM python:3.11
+
+# Install Poetry
+RUN pip install poetry
+
+# Configure Poetry
+ENV POETRY_NO_INTERACTION=1 \
+    POETRY_VENV_IN_PROJECT=1 \
+    POETRY_CACHE_DIR=/tmp/poetry_cache
+
+WORKDIR /app
+
+# Copy Poetry files
+COPY pyproject.toml poetry.lock ./
+
+# Install dependencies
+RUN poetry install --only=main && rm -rf $POETRY_CACHE_DIR
+
+# Copy application code
+COPY . .
+
+# Run with Poetry
+CMD ["poetry", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### docker-compose.yml with Poetry
+```yaml
+version: '3.8'
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - POETRY_NO_INTERACTION=1
+    command: poetry run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+## Dependency Groups
+
+### Organize Dependencies by Purpose
+```toml
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+black = "^23.0.0"
+flake8 = "^6.1.0"
+
+[tool.poetry.group.test.dependencies]
+pytest-cov = "^4.1.0"
+pytest-asyncio = "^0.21.0"
+
+[tool.poetry.group.docs.dependencies]
+mkdocs = "^1.5.0"
+mkdocs-material = "^9.4.0"
+```
+
+### Install Specific Groups
+```powershell
+# Install only main dependencies
+poetry install --only main
+
+# Install main + dev dependencies
+poetry install --with dev
+
+# Install all groups
+poetry install --all-extras
+```
+
+## CI/CD Integration
+
+### GitHub Actions Example
+```yaml
+- name: Install Poetry
+  uses: snok/install-poetry@v1
+  
+- name: Install dependencies
+  run: poetry install
+
+- name: Run tests
+  run: poetry run pytest
+
+- name: Run linting
+  run: poetry run black --check .
+```
+
+## Troubleshooting Common Issues
+
+### Version Conflicts
+```powershell
+# Check for dependency conflicts
+poetry check
+
+# Show dependency tree
+poetry show --tree
+
+# Update lock file
+poetry lock --no-update
+```
+
+### Environment Issues
+```powershell
+# Clear Poetry cache
+poetry cache clear pypi --all
+
+# Recreate virtual environment
+poetry env remove python
+poetry install
+```
+
+## Documentation Standards
+
+When writing documentation or README files:
+- Always reference `poetry install` instead of `pip install -r requirements.txt`
+- Include Poetry installation instructions
+- Use Poetry commands in all examples
+- Reference `pyproject.toml` as the dependency source
+
+## Legacy Migration
+
+If you encounter old pip-based setups:
+1. Create `pyproject.toml` with `poetry init`
+2. Add dependencies with `poetry add` instead of copying from requirements.txt
+3. Remove requirements.txt files after migration
+4. Update documentation and CI/CD scripts
+
+
+**Remember: All Python dependency management in backend projects must use Poetry. This ensures reproducible builds, proper dependency resolution, and consistent development environments.**

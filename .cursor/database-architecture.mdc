@@ -1,0 +1,691 @@
+---
+description: 
+globs: "**/*.py,**/models/**,**/database/**,**/migrations/**,**/alembic/**,**/alembic.ini,**/schemas/**"
+alwaysApply: false
+---
+---
+description: Enforce SQLAlchemy best practices, Alembic migrations, and database optimization patterns
+---
+
+# Database Practices Rule
+
+## Core Requirements
+**ALWAYS use proper database patterns with SQLAlchemy, Alembic migrations, and connection management.** Database architecture must be robust, scalable, and maintainable.
+
+## Database Configuration & Connection Management
+
+### Production-Ready Database Setup
+```python
+# database.py
+from sqlalchemy import create_engine, event
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import QueuePool
+from contextlib import contextmanager
+import os
+import logging
+
+# ✅ Production database configuration
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(
+    DATABASE_URL,
+    poolclass=QueuePool,
+    pool_size=20,                    # Connection pool size
+    max_overflow=30,                 # Additional connections beyond pool_size
+    pool_pre_ping=True,              # Verify connections before use
+    pool_recycle=3600,               # Recycle connections every hour
+    pool_timeout=30,                 # Timeout for getting connection
+    echo=False,                      # Set to True for SQL debugging
+    connect_args={
+        "check_same_thread": False,  # For SQLite only
+        "connect_timeout": 10,
+    }
+)
+
+# ✅ Session configuration
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+    expire_on_commit=False  # Keep objects usable after commit
+)
+
+Base = declarative_base()
+
+# ✅ Connection event listeners for monitoring
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    """Set SQLite pragmas for better performance."""
+    if 'sqlite' in str(engine.url):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.close()
+
+@event.listens_for(engine, "checkout")
+def receive_checkout(dbapi_connection, connection_record, connection_proxy):
+    """Log connection checkout for monitoring."""
+    logging.debug("Connection checked out from pool")
+
+# ✅ FastAPI dependency
+def get_db():
+    """Database session dependency for FastAPI."""
+    db = SessionLocal()
+    try:
+        yield db
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+# ✅ Context manager for manual database operations
+@contextmanager
+def get_db_session():
+    """Context manager for database operations outside FastAPI."""
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+```
+
+## SQLAlchemy Model Standards
+
+### Model Definition Best Practices
+```python
+# models/user.py
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Index
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import UUID
+from database import Base
+import uuid
+
+class User(Base):
+    __tablename__ = "users"
+    
+    # ✅ Primary key with proper type
+    id = Column(Integer, primary_key=True, index=True)
+    # Alternative UUID primary key for distributed systems
+    # id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # ✅ Required fields with constraints
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    username = Column(String(50), unique=True, index=True, nullable=False)
+    full_name = Column(String(255), nullable=False)
+    
+    # ✅ Optional fields with defaults
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_verified = Column(Boolean, default=False, nullable=False)
+    is_superuser = Column(Boolean, default=False, nullable=False)
+    
+    # ✅ Hashed password (never store plaintext)
+    hashed_password = Column(String(255), nullable=False)
+    
+    # ✅ Automatic timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    last_login = Column(DateTime(timezone=True), nullable=True)
+    
+    # ✅ Soft delete support
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # ✅ Relationships with proper configuration
+    posts = relationship("Post", back_populates="author", cascade="all, delete-orphan")
+    profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    
+    # ✅ Composite indexes for query optimization
+    __table_args__ = (
+        Index('idx_user_email_active', 'email', 'is_active'),
+        Index('idx_user_created_active', 'created_at', 'is_active'),
+        Index('idx_user_deleted', 'deleted_at'),
+    )
+    
+    def __repr__(self):
+        return f"<User(id={self.id}, email='{self.email}')>"
+    
+    # ✅ Model methods for business logic
+    def is_authenticated(self) -> bool:
+        """Check if user is authenticated."""
+        return self.is_active and not self.deleted_at
+    
+    def soft_delete(self):
+        """Soft delete user."""
+        self.deleted_at = func.now()
+        self.is_active = False
+
+class Post(Base):
+    __tablename__ = "posts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False, index=True)
+    slug = Column(String(255), unique=True, index=True, nullable=False)
+    content = Column(Text, nullable=False)
+    excerpt = Column(Text, nullable=True)
+    
+    # ✅ Status enum using string constraints
+    status = Column(String(20), default="draft", nullable=False)  # draft, published, archived
+    
+    # ✅ SEO and metadata
+    meta_title = Column(String(60), nullable=True)
+    meta_description = Column(String(160), nullable=True)
+    
+    # ✅ Foreign key with proper indexing
+    author_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True)
+    
+    # ✅ Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # ✅ Relationships
+    author = relationship("User", back_populates="posts")
+    category = relationship("Category", back_populates="posts")
+    comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
+    tags = relationship("Tag", secondary="post_tags", back_populates="posts")
+    
+    # ✅ Indexes for common queries
+    __table_args__ = (
+        Index('idx_post_status_published', 'status', 'published_at'),
+        Index('idx_post_author_status', 'author_id', 'status'),
+        Index('idx_post_category_status', 'category_id', 'status'),
+        Index('idx_post_created', 'created_at'),
+    )
+    
+    def __repr__(self):
+        return f"<Post(id={self.id}, title='{self.title}', status='{self.status}')>"
+
+# ✅ Many-to-many relationship table
+from sqlalchemy import Table
+
+post_tags = Table(
+    'post_tags',
+    Base.metadata,
+    Column('post_id', Integer, ForeignKey('posts.id', ondelete='CASCADE'), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('tags.id', ondelete='CASCADE'), primary_key=True),
+    # ✅ Timestamps on junction table
+    Column('created_at', DateTime(timezone=True), server_default=func.now(), nullable=False)
+)
+
+class Tag(Base):
+    __tablename__ = "tags"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, nullable=False, index=True)
+    slug = Column(String(50), unique=True, nullable=False, index=True)
+    
+    # ✅ Relationship through association table
+    posts = relationship("Post", secondary=post_tags, back_populates="tags")
+```
+
+### Repository Pattern Implementation
+```python
+# repositories/base.py
+from typing import TypeVar, Generic, List, Optional, Type, Dict, Any
+from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_, desc, asc
+from database import Base
+
+T = TypeVar('T', bound=Base)
+
+class BaseRepository(Generic[T]):
+    def __init__(self, db: Session, model: Type[T]):
+        self.db = db
+        self.model = model
+    
+    # ✅ Basic CRUD operations
+    def create(self, obj_in: Dict[str, Any]) -> T:
+        """Create new record."""
+        db_obj = self.model(**obj_in)
+        self.db.add(db_obj)
+        self.db.commit()
+        self.db.refresh(db_obj)
+        return db_obj
+    
+    def get(self, id: int) -> Optional[T]:
+        """Get record by ID."""
+        return self.db.query(self.model).filter(self.model.id == id).first()
+    
+    def get_multi(
+        self, 
+        skip: int = 0, 
+        limit: int = 100,
+        filters: Optional[Dict[str, Any]] = None,
+        order_by: Optional[str] = None
+    ) -> List[T]:
+        """Get multiple records with filtering and pagination."""
+        query = self.db.query(self.model)
+        
+        # Apply filters
+        if filters:
+            filter_conditions = []
+            for key, value in filters.items():
+                if hasattr(self.model, key):
+                    if isinstance(value, list):
+                        filter_conditions.append(getattr(self.model, key).in_(value))
+                    else:
+                        filter_conditions.append(getattr(self.model, key) == value)
+            
+            if filter_conditions:
+                query = query.filter(and_(*filter_conditions))
+        
+        # Apply ordering
+        if order_by:
+            if order_by.startswith('-'):
+                query = query.order_by(desc(getattr(self.model, order_by[1:])))
+            else:
+                query = query.order_by(asc(getattr(self.model, order_by)))
+        
+        return query.offset(skip).limit(limit).all()
+    
+    def update(self, id: int, obj_in: Dict[str, Any]) -> Optional[T]:
+        """Update existing record."""
+        db_obj = self.get(id)
+        if db_obj:
+            for key, value in obj_in.items():
+                if hasattr(db_obj, key):
+                    setattr(db_obj, key, value)
+            self.db.commit()
+            self.db.refresh(db_obj)
+        return db_obj
+    
+    def delete(self, id: int) -> bool:
+        """Delete record by ID."""
+        db_obj = self.get(id)
+        if db_obj:
+            self.db.delete(db_obj)
+            self.db.commit()
+            return True
+        return False
+    
+    def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
+        """Count records with optional filtering."""
+        query = self.db.query(self.model)
+        
+        if filters:
+            filter_conditions = []
+            for key, value in filters.items():
+                if hasattr(self.model, key):
+                    filter_conditions.append(getattr(self.model, key) == value)
+            
+            if filter_conditions:
+                query = query.filter(and_(*filter_conditions))
+        
+        return query.count()
+
+# repositories/user.py
+from models.user import User
+from repositories.base import BaseRepository
+
+class UserRepository(BaseRepository[User]):
+    def __init__(self, db: Session):
+        super().__init__(db, User)
+    
+    def get_by_email(self, email: str) -> Optional[User]:
+        """Get user by email address."""
+        return self.db.query(User).filter(
+            User.email == email,
+            User.deleted_at.is_(None)
+        ).first()
+    
+    def get_active_users(self, skip: int = 0, limit: int = 100) -> List[User]:
+        """Get active, non-deleted users."""
+        return self.db.query(User).filter(
+            User.is_active == True,
+            User.deleted_at.is_(None)
+        ).offset(skip).limit(limit).all()
+    
+    def search_users(self, search_term: str) -> List[User]:
+        """Search users by name or email."""
+        return self.db.query(User).filter(
+            or_(
+                User.full_name.ilike(f"%{search_term}%"),
+                User.email.ilike(f"%{search_term}%")
+            ),
+            User.deleted_at.is_(None)
+        ).all()
+```
+
+## Alembic Migration Management
+
+### Alembic Configuration
+```ini
+# alembic.ini
+[alembic]
+script_location = migrations
+prepend_sys_path = .
+version_path_separator = os
+sqlalchemy.url = driver://user:pass@localhost/dbname
+
+[post_write_hooks]
+hooks = black
+black.type = console_scripts
+black.entrypoint = black
+black.options = -l 88 REVISION_SCRIPT_FILENAME
+
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARN
+handlers = console
+
+[logger_sqlalchemy]
+level = WARN
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
+```
+
+### Migration Best Practices
+```python
+# migrations/env.py
+from alembic import context
+from sqlalchemy import engine_from_config, pool
+from logging.config import fileConfig
+import os
+
+# Import all models to ensure they're registered
+from models.user import User
+from models.post import Post
+from database import Base
+
+config = context.config
+
+# Set database URL from environment
+config.set_main_option('sqlalchemy.url', os.getenv('DATABASE_URL'))
+
+fileConfig(config.config_file_name)
+target_metadata = Base.metadata
+
+def run_migrations_online():
+    """Run migrations in 'online' mode."""
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True,
+            include_schemas=True
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+run_migrations_online()
+```
+
+### Migration Commands
+```powershell
+# Generate new migration
+poetry run alembic revision --autogenerate -m "Add user table"
+
+# Apply migrations
+poetry run alembic upgrade head
+
+# Rollback migration
+poetry run alembic downgrade -1
+
+# Show current revision
+poetry run alembic current
+
+# Show migration history
+poetry run alembic history
+
+# Check if database is up to date
+poetry run alembic check
+```
+
+### Example Migration File
+```python
+# migrations/versions/001_add_user_table.py
+"""Add user table
+
+Revision ID: 001
+Revises: 
+Create Date: 2023-12-01 10:00:00.000000
+
+"""
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+# revision identifiers
+revision = '001'
+down_revision = None
+branch_labels = None
+depends_on = None
+
+def upgrade():
+    """Apply migration."""
+    # ✅ Create table with all constraints
+    op.create_table('users',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('email', sa.String(length=255), nullable=False),
+        sa.Column('username', sa.String(length=50), nullable=False),
+        sa.Column('full_name', sa.String(length=255), nullable=False),
+        sa.Column('hashed_password', sa.String(length=255), nullable=False),
+        sa.Column('is_active', sa.Boolean(), server_default=sa.text('true'), nullable=False),
+        sa.Column('is_verified', sa.Boolean(), server_default=sa.text('false'), nullable=False),
+        sa.Column('is_superuser', sa.Boolean(), server_default=sa.text('false'), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('last_login', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint('id')
+    )
+    
+    # ✅ Create indexes
+    op.create_index('idx_user_email', 'users', ['email'], unique=True)
+    op.create_index('idx_user_username', 'users', ['username'], unique=True)
+    op.create_index('idx_user_email_active', 'users', ['email', 'is_active'])
+    op.create_index('idx_user_created_active', 'users', ['created_at', 'is_active'])
+    op.create_index('idx_user_deleted', 'users', ['deleted_at'])
+
+def downgrade():
+    """Rollback migration."""
+    # ✅ Drop indexes first
+    op.drop_index('idx_user_deleted', table_name='users')
+    op.drop_index('idx_user_created_active', table_name='users')
+    op.drop_index('idx_user_email_active', table_name='users')
+    op.drop_index('idx_user_username', table_name='users')
+    op.drop_index('idx_user_email', table_name='users')
+    
+    # ✅ Drop table
+    op.drop_table('users')
+```
+
+## Database Query Optimization
+
+### Efficient Query Patterns
+```python
+# services/user_service.py
+from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy import and_, or_, func, case, exists
+from repositories.user import UserRepository
+
+class UserService:
+    def __init__(self, db: Session):
+        self.db = db
+        self.repo = UserRepository(db)
+    
+    # ✅ Eager loading to prevent N+1 queries
+    def get_users_with_posts(self, limit: int = 100):
+        """Get users with their posts in a single query."""
+        return self.db.query(User).options(
+            selectinload(User.posts),
+            joinedload(User.profile)
+        ).filter(User.is_active == True).limit(limit).all()
+    
+    # ✅ Efficient counting with filters
+    def get_user_stats(self):
+        """Get user statistics efficiently."""
+        stats = self.db.query(
+            func.count(User.id).label('total_users'),
+            func.count(case([(User.is_active == True, User.id)])).label('active_users'),
+            func.count(case([(User.is_verified == True, User.id)])).label('verified_users'),
+            func.avg(
+                func.extract('epoch', func.now() - User.created_at) / 86400
+            ).label('avg_days_since_signup')
+        ).filter(User.deleted_at.is_(None)).first()
+        
+        return {
+            'total_users': stats.total_users,
+            'active_users': stats.active_users,
+            'verified_users': stats.verified_users,
+            'avg_days_since_signup': float(stats.avg_days_since_signup or 0)
+        }
+    
+    # ✅ Batch operations for performance
+    def activate_users_batch(self, user_ids: List[int]) -> int:
+        """Activate multiple users in a single query."""
+        updated_count = self.db.query(User).filter(
+            User.id.in_(user_ids),
+            User.deleted_at.is_(None)
+        ).update(
+            {User.is_active: True, User.updated_at: func.now()},
+            synchronize_session=False
+        )
+        self.db.commit()
+        return updated_count
+    
+    # ✅ Subquery for complex filtering
+    def get_users_with_recent_posts(self, days: int = 30):
+        """Get users who have posted in the last N days."""
+        recent_post_subquery = self.db.query(Post.author_id).filter(
+            Post.created_at >= func.now() - func.interval(f'{days} days')
+        ).subquery()
+        
+        return self.db.query(User).filter(
+            User.id.in_(recent_post_subquery),
+            User.is_active == True
+        ).all()
+    
+    # ✅ Exists clause for better performance
+    def get_users_without_posts(self):
+        """Get users who haven't created any posts."""
+        return self.db.query(User).filter(
+            ~exists().where(Post.author_id == User.id),
+            User.is_active == True
+        ).all()
+```
+
+## Database Performance & Monitoring
+
+### Query Performance Monitoring
+```python
+# database/monitoring.py
+import time
+import logging
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
+logger = logging.getLogger(__name__)
+
+# ✅ Query performance logging
+@event.listens_for(Engine, "before_cursor_execute")
+def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    context._query_start_time = time.time()
+
+@event.listens_for(Engine, "after_cursor_execute")
+def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    total = time.time() - context._query_start_time
+    
+    # Log slow queries
+    if total > 0.5:  # Queries taking more than 500ms
+        logger.warning(
+            f"Slow query detected: {total:.2f}s\n"
+            f"Statement: {statement}\n"
+            f"Parameters: {parameters}"
+        )
+
+# ✅ Connection pool monitoring
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    logger.info("New database connection established")
+
+@event.listens_for(Engine, "checkout")
+def receive_checkout(dbapi_connection, connection_record, connection_proxy):
+    logger.debug("Connection checked out from pool")
+
+@event.listens_for(Engine, "checkin")
+def receive_checkin(dbapi_connection, connection_record):
+    logger.debug("Connection returned to pool")
+```
+
+## Common Database Anti-patterns
+
+### Model Design Violations
+```python
+# ❌ Wrong - Poor model design
+class BadUser(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True)  # No index
+    email = Column(String)  # No length limit, no uniqueness
+    password = Column(String)  # Storing plaintext password
+    data = Column(Text)  # Storing JSON as text instead of proper columns
+    # No timestamps
+    # No soft delete support
+
+# ❌ Wrong - No foreign key constraints
+class BadPost(Base):
+    __tablename__ = "posts"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer)  # No foreign key constraint
+    # No indexes on foreign keys
+
+# ❌ Wrong - N+1 query pattern
+def get_users_with_posts_bad():
+    users = db.query(User).all()
+    for user in users:
+        posts = db.query(Post).filter(Post.author_id == user.id).all()
+        user.posts = posts  # Causes N+1 queries
+    return users
+
+# ❌ Wrong - No pagination
+def get_all_users_bad():
+    return db.query(User).all()  # Could return millions of records
+
+# ❌ Wrong - String formatting in queries (SQL injection risk)
+def get_user_by_email_bad(email: str):
+    query = f"SELECT * FROM users WHERE email = '{email}'"  # SQL injection risk
+    return db.execute(query)
+```
+
+
+**Remember: Database performance and integrity are critical. Use proper indexes, foreign key constraints, query optimization, migration management, and monitoring to ensure a robust data layer.**
