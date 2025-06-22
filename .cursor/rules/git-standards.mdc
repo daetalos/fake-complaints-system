@@ -7,7 +7,20 @@ alwaysApply: false
 description: Enforce Git workflow standards, conventional commits, and repository organization
 ---
 
-# Git & Commit Standards Rule
+# Git Standards
+
+This document outlines the standards and best practices for using Git in this project. Adhering to these standards ensures a clean, understandable, and maintainable version history.
+
+## Core Workflow
+
+1.  **Branching:** All new work, including features and bugfixes, MUST be done on a feature branch created from the latest version of the `main` branch.
+    -   Before creating a new branch, always run `git checkout main` followed by `git pull origin main` to ensure you are starting from the most up-to-date point.
+2.  **Merging:** Feature branches MUST be merged into `main` exclusively through Pull Requests (PRs) on the remote Git provider (e.g., GitHub, GitLab).
+    -   **NEVER** merge a local feature branch directly into your local `main` branch (`git merge my-feature`).
+    -   **NEVER** push directly to the `main` branch. This should be enforced with branch protection rules on the remote.
+3.  **Staying Updated:** To incorporate new changes from `main` into your active feature branch, use `git rebase main`. This maintains a clean, linear history. Avoid using `git merge main` for this purpose.
+
+## Commit Messages
 
 ## Core Requirements
 **ALWAYS follow conventional commit standards and maintain a clean Git history.** Establish consistent Git workflows from project inception.
@@ -58,7 +71,7 @@ BREAKING CHANGE: The /auth/login endpoint now requires OAuth2 instead of basic a
 "Updated files"                  # No context
 "WIP"                           # Not descriptive
 "asdf"                          # Meaningless
-"Fixed the thing that was broken" # Too casual
+"Fixed the thing that was in a broken state" # Too casual
 ```
 
 ## Branch Naming Conventions
@@ -379,34 +392,76 @@ echo "✅ Commit message format is valid"
 
 ## Git Workflow Standards
 
+### Repository Initialization: The First Push
+**To avoid bootstrap paradoxes, the `main` branch MUST be created on the remote repository with a single, minimal commit *before* any feature development begins.** This allows the very first feature to be managed through a proper pull request.
+
+**Procedure for a New Repository:**
+
+1.  **Initialize the local repository.**
+    ```powershell
+    git init
+    git config --local init.defaultBranch main
+    ```
+
+2.  **Create essential root files.**
+    At a minimum, create a `README.md` and a comprehensive `.gitignore`.
+    ```powershell
+    New-Item README.md
+    New-Item .gitignore
+    # (Then, populate .gitignore from the template below)
+    ```
+
+3.  **Make the initial commit.**
+    ```powershell
+    git add README.md .gitignore
+    git commit -m "chore(project): initial commit"
+    ```
+
+4.  **Add the remote and push `main`.**
+    This establishes the `main` branch on the remote server.
+    ```powershell
+    git remote add origin <your-remote-repository-url>
+    git push -u origin main
+    ```
+
+5.  **Immediately create your first feature branch.**
+    All subsequent work MUST be done on a feature branch.
+    ```powershell
+    git checkout -b feature/PROJECT-1-initial-project-setup
+    ```
+
 ### Feature Development Workflow
 ```powershell
 # Start new feature
-git checkout main
-git pull origin main
+git checkout main; git pull origin main
 git checkout -b feature/user-authentication
 
 # Make changes and commit
 git add .
 git commit -m "feat(auth): add JWT token validation"
 
+# For multi-line commits, it is safer to run 'git commit' without flags
+# to open a text editor, avoiding potential shell parsing issues.
+# Example:
+# git commit 
+# (This will open VS Code, Nano, Vim, etc. to write the full message)
+
 # Push feature branch
 git push -u origin feature/user-authentication
 
 # Create pull request via GitHub CLI or web interface
+# Note: Ensure 'gh' is installed and authenticated
 gh pr create --title "feat(auth): add user authentication" --body "Implements JWT-based authentication system"
 
 # After review and approval
-git checkout main
-git pull origin main
+git checkout main; git pull origin main
 git branch -d feature/user-authentication
 ```
 
 ### Hotfix Workflow
 ```powershell
 # Create hotfix from main
-git checkout main
-git pull origin main
+git checkout main; git pull origin main
 git checkout -b hotfix/critical-security-patch
 
 # Fix and commit
@@ -423,13 +478,11 @@ gh pr create --title "URGENT: Security patch" --body "Fixes critical SQL injecti
 ### Release Workflow
 ```powershell
 # Create release branch
-git checkout main
-git pull origin main
+git checkout main; git pull origin main
 git checkout -b release/v1.2.0
 
 # Update version numbers and changelog
 # Commit version changes
-git add .
 git commit -m "chore(release): bump version to 1.2.0"
 
 # Create release PR
@@ -437,8 +490,7 @@ git push -u origin release/v1.2.0
 gh pr create --title "Release v1.2.0" --body "Release version 1.2.0 with new features and bug fixes"
 
 # After merge, tag the release
-git checkout main
-git pull origin main
+git checkout main; git pull origin main
 git tag -a v1.2.0 -m "Release version 1.2.0"
 git push origin v1.2.0
 ```
@@ -546,14 +598,15 @@ git add -p  # Interactive staging
 git add backend/  # Add directory
 
 # Commit with conventional format
+# For simple messages:
 git commit -m "feat(api): add user endpoint"
+# For complex/multi-line messages, run 'git commit' and use your editor.
 
 # Push current branch
 git push
 
 # Update local main branch
-git checkout main
-git pull origin main
+git checkout main; git pull origin main
 
 # Clean up merged branches
 git branch --merged | Where-Object { $_ -notmatch "main|develop" } | ForEach-Object { git branch -d $_.Trim() }
@@ -577,3 +630,46 @@ git show commit-hash
 
 
 **Remember: Consistent Git practices are essential for team collaboration. Always use conventional commits, maintain clean history, and follow established branching strategies.**
+
+### Pull Request Content Generation
+
+**ALWAYS generate a complete pull request description after pushing a feature or fix branch.** This is a critical step to ensure clear communication and efficient code reviews. The generated content should be based on the project's `PULL_REQUEST_TEMPLATE.md`.
+
+**Procedure:**
+1.  After pushing the branch, identify that a pull request needs to be created.
+2.  Read the `.github/PULL_REQUEST_TEMPLATE.md` to understand the required structure.
+3.  Generate a complete title and body for the pull request, filling out all relevant sections of the template.
+4.  Present this content to the user to be copied into the pull request on the Git hosting platform.
+
+This ensures that every PR is well-documented from the moment of its creation.
+
+## Merging and Rebasing
+```
+
+### Continuing Development After a Merge
+
+**After a feature pull request is merged, the local `main` branch must be updated, and a new feature branch must be created from it for the next task.** This ensures a clean history and prevents old feature branches from being stacked on top of each other.
+
+**Procedure:**
+1.  **Switch to the local `main` branch:**
+    ```powershell
+    git checkout main
+    ```
+2.  **Pull the latest changes from the remote `main` branch:**
+    This syncs your local repository with the newly merged code.
+    ```powershell
+    git pull origin main
+    ```
+3.  **Create a new feature branch for the next task:**
+    Name the branch according to the conventional commit standard.
+    ```powershell
+    git checkout -b feat/PROJECT-3-linting-and-formatting
+    ```
+4.  **Delete the old, merged feature branch:**
+    This keeps your local repository clean.
+    ```powershell
+    git branch -d name-of-old-feature-branch
+    ```
+
+## Conventional Commits
+# ... existing code ...

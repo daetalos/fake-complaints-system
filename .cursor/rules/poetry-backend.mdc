@@ -1,0 +1,237 @@
+---
+description: 
+globs: "backend/**/*.py", "**/pyproject.toml", "**/poetry.lock", "backend/**/requirements*.txt", "**/Dockerfile", "**/docker-compose*.yml", "**/*.md"
+alwaysApply: false
+---
+---
+description: Enforce Poetry for all Python dependency management in backend projects
+---
+
+# Poetry Dependency Management Rule
+
+## Core Requirement
+**ALWAYS use Poetry for Python dependency management in backend projects.** Do not use pip, pipenv, conda, or other package managers unless explicitly requested.
+
+## Command Replacements
+
+### Package Installation
+- ❌ `pip install package` → ✅ `poetry add package`
+- ❌ `pip install package==1.2.3` → ✅ `poetry add package@1.2.3`
+- ❌ `pip install -r requirements.txt` → ✅ `poetry install`
+- ❌ `pip install --dev package` → ✅ `poetry add --group dev package`
+- ❌ `pip install -e .` → ✅ `poetry install`
+
+### Development Dependencies
+- ❌ `pip install pytest` → ✅ `poetry add --group dev pytest`
+- ❌ `pip install black flake8 mypy` → ✅ `poetry add --group dev black flake8 mypy`
+- ❌ `pip install -r requirements-dev.txt` → ✅ `poetry install --with dev`
+
+### Package Removal
+- ❌ `pip uninstall package` → ✅ `poetry remove package`
+- ❌ `pip uninstall -r requirements.txt` → ✅ `poetry remove package1 package2`
+
+### Environment Management
+- ❌ `python -m venv venv` → ✅ `poetry shell` (or Poetry handles automatically)
+- ❌ `source venv/bin/activate` → ✅ `poetry shell`
+- ❌ `deactivate` → ✅ `exit` (from poetry shell)
+- ❌ `pip freeze > requirements.txt` → ✅ `poetry export -f requirements.txt --output requirements.txt` (if needed)
+
+### Running Commands
+- ❌ `python script.py` → ✅ `poetry run python script.py`
+- ❌ `pytest` → ✅ `poetry run pytest`
+- ❌ `black .` → ✅ `poetry run black .`
+- ❌ `uvicorn main:app` → ✅ `poetry run uvicorn main:app`
+
+### Project Initialization
+- ❌ `pip init`
+- ❌ `poetry new project-name` (This creates a flat layout, which is discouraged)
+- ✅ `poetry new backend --src` (This creates a service directory with a `src` layout)
+
+## Project Initialization for a Backend Service
+**ALWAYS use a `src` layout for new Python backend services.** Per the `docker-architecture.mdc` rules, services should live in their own directories (e.g., `backend/`, `frontend/`).
+
+The `poetry new --src` command is the most reliable way to create this structure.
+
+**Recommended Method (From Project Root):**
+```powershell
+# From the project root, run this command.
+# It creates the 'backend' directory, a 'src' directory inside it,
+# a package named 'backend', and a pre-configured pyproject.toml.
+poetry new backend --src
+
+# Now, you can work within the backend service directory
+cd backend
+
+# You can then add your dependencies
+poetry add fastapi uvicorn
+```
+This single command generates the correct structure and configuration, aligning with our multi-service architecture.
+
+### Manual `src`-layout Initialization
+If you are adding Poetry to an *existing* `backend` directory, you may need to configure it manually.
+
+1.  **Initialize Poetry in your service root:**
+    ```powershell
+    cd backend
+    poetry init
+    ```
+    When prompted, the package name should ideally match the service (e.g., `backend`).
+
+2.  **Ensure your `pyproject.toml` is configured for `src` layout:**
+    You must manually add the `packages` key to `pyproject.toml`. The `include` value should be the package name.
+    ```toml
+    [tool.poetry]
+    name = "backend"
+    # ...
+    packages = [
+        { include = "backend", from = "src" }
+    ]
+    # ...
+    ```
+
+3.  **Ensure your file structure is correct:**
+    ```
+    project-root/
+    └── backend/
+        ├── src/
+        │   └── backend/
+        │       └── __init__.py
+        ├── pyproject.toml
+        └── poetry.lock
+    ```
+
+## File Structure Expectations
+
+### Required Files
+- `pyproject.toml` - Main dependency configuration (NOT requirements.txt)
+- `poetry.lock` - Lock file for reproducible installs
+- `src/` - Directory containing the main Python package.
+- ❌ Avoid: `requirements.txt`, `requirements-dev.txt`, `Pipfile`, `environment.yml`
+
+### __init__.py Requirement
+The main package directory (e.g., `src/my_cool_project/`) **MUST** contain an `__init__.py` file. It is best practice to define the package version in this file. An empty `__init__.py` can cause build tools to fail.
+
+**Example (`src/my_cool_project/__init__.py`):**
+```python
+__version__ = "0.1.0"
+```
+
+### pyproject.toml Structure
+```toml
+[tool.poetry]
+name = "backend-project"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+packages = [
+    { include = "backend_project", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.104.0"
+uvicorn = "^0.24.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+black = "^23.0.0"
+flake8 = "^6.1.0"
+mypy = "^1.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+```
+
+## Common Poetry Commands for Backend Development
+
+### Daily Workflow (PowerShell Compatible)
+```powershell
+# Install all dependencies (including dev)
+poetry install
+
+# Install only production dependencies
+poetry install --only main
+
+# Add a new dependency
+poetry add fastapi sqlalchemy
+
+# Add development dependency
+poetry add --group dev pytest black
+
+# Update dependencies
+poetry update
+
+# Show installed packages
+poetry show
+
+# Check for dependency issues
+poetry check
+```
+
+### Backend-Specific Examples
+```powershell
+# Web framework dependencies
+poetry add fastapi uvicorn
+
+# Database dependencies
+poetry add sqlalchemy alembic psycopg2-binary
+
+# Development tools
+poetry add --group dev pytest pytest-asyncio black flake8 mypy
+
+# Run the backend server
+poetry run uvicorn main:app --reload
+
+# Run tests
+poetry run pytest
+
+# Database migrations
+poetry run alembic upgrade head
+```
+
+## Docker Integration
+For standards on how to containerize a Poetry-based backend service, including the recommended multi-stage `Dockerfile` and `docker-compose.yml` examples, **refer to the `docker-architecture.mdc` guide.**
+
+That guide is the canonical source of truth for:
+- Project structure (`backend/`, `frontend/`, etc.)
+- The standard multi-stage `Dockerfile` for Python services.
+- `docker-compose.yml` examples for orchestrating services.
+
+Following the `docker-architecture.mdc` guide in conjunction with this one will ensure your Poetry project is structured, containerized, and deployed according to best practices.
+
+## Dependency Groups
+
+### Organize Dependencies by Purpose
+# ... existing code ...
+
+## Code Quality with Ruff
+
+This project uses `ruff` for linting and formatting. It should be configured in `pyproject.toml`.
+
+### Example Configuration
+
+Use the following structure as a template. Note that global settings like `line-length` and `extend-exclude` belong directly under `[tool.ruff]`, not under `[tool.ruff.lint]`.
+
+```toml
+[tool.ruff]
+# Global settings shared by the linter and formatter.
+line-length = 88
+extend-exclude = [
+    "docs",
+    "**/__pycache__",
+]
+
+# Allow ruff to automatically fix issues.
+fix = true
+
+[tool.ruff.lint]
+# Select the rule sets to use.
+# E/W = pycodestyle, F = Pyflakes, I = isort
+select = ["E", "W", "F", "I"]
+
+[tool.ruff.format]
+# Use black-compatible formatting.
+quote-style = "double"
+indent-style = "space"
+```

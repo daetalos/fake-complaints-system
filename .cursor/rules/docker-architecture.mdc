@@ -61,41 +61,89 @@ project-root/
 ## Service-Specific Dockerfile Examples
 
 ### Backend Dockerfile (backend/Dockerfile)
+A multi-stage build is **STRONGLY RECOMMENDED** for Python applications to create a lean and reliable image. This approach separates the build environment (with build tools and dependencies) from the final, clean runtime environment.
+
 ```dockerfile
-FROM python:3.11-slim
+# ---- Base Stage ----
+# Use a specific, slim Python version for reproducibility and smaller size.
+FROM python:3.11-slim as base
 
-# Install Poetry
-RUN pip install poetry
+# Set environment variables for consistency and performance.
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    # See poetry-backend.mdc for latest recommended Poetry version
+    POETRY_VERSION=1.7.1
 
-# Configure Poetry
-ENV POETRY_NO_INTERACTION=1 \
-    POETRY_VENV_IN_PROJECT=1 \
-    POETRY_CACHE_DIR=/tmp/poetry_cache
+# Install Poetry into the base image.
+RUN pip install "poetry==${POETRY_VERSION}"
+
+# ---- Builder Stage ----
+# This stage builds the virtual environment with all dependencies.
+FROM base as builder
 
 WORKDIR /app
 
-# Copy Poetry files
-COPY pyproject.toml poetry.lock ./
+# Copy only the files needed to install dependencies.
+# This leverages Docker's layer caching effectively. If these files don't
+# change, this layer will be cached.
+COPY poetry.lock pyproject.toml ./
 
-# Install dependencies
-RUN poetry install --only=main && rm -rf $POETRY_CACHE_DIR
+# Install dependencies, creating a virtual environment in /app/.venv
+# --no-root: Skips installing the project's own code.
+# --only main: Skips installing development dependencies (e.g., pytest).
+RUN poetry install --no-root --only main
 
-# Copy application code
-COPY . .
+# ---- Final Stage ----
+# This stage creates the final, lean image for production.
+FROM base as final
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+WORKDIR /app
 
+# Copy the virtual environment from the builder stage.
+COPY --from=builder /app/.venv/ .venv/
+
+# Activate the virtual environment by adding it to the PATH.
+# All subsequent commands (like CMD) will use this Python environment.
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Copy the application source code.
+# Assumes a 'src' layout as recommended in poetry-backend.mdc.
+COPY src/ ./src/
+
+# Set PYTHONPATH to ensure the application's modules are importable.
+ENV PYTHONPATH="${PYTHONPATH}:/app/src"
+
+# Health check (optional but recommended).
+# This requires a /health endpoint in your FastAPI application.
+# HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+#   CMD curl -f http://localhost:8000/health || exit 1
+
+# Expose the port the application will run on.
 EXPOSE 8000
 
-CMD ["poetry", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Create a non-root user to run the application for better security.
+RUN useradd --create-home --shell /bin/bash appuser
+USER appuser
+
+# Command to run the application.
+# It uses 'uvicorn' directly since the venv is on the PATH.
+# Assumes the package is named 'backend' as per the poetry-backend.mdc guide.
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ### Frontend Dockerfile (frontend/Dockerfile)
 ```dockerfile
 # Multi-stage build for production
 FROM node:18-alpine AS builder
+
+# Define a build-time argument for the API URL.
+# This will be passed in from docker-compose.yml.
+ARG VITE_API_BASE_URL
+
+# Set the environment variable for the build process, making it available to Vite.
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 WORKDIR /app
 
@@ -167,6 +215,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # Pass the backend's public URL to the frontend during the build.
+      args:
+        - VITE_API_BASE_URL=http://localhost:8000
     ports:
       - "3000:80"
     volumes:

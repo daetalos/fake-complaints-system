@@ -184,5 +184,51 @@ dev:
 # - Basic error handling
 ```
 
+## Cross-Platform Makefile Standards
+
+- **Do not use ANSI color codes** in `@echo` statements. Output should be plain text for compatibility on all platforms.
+- **Do not wrap `@echo` output in double quotes**; use `@echo text` instead of `@echo "text"` to avoid literal quotes in Windows output.
+- **Never indent comments inside recipes**. Place all comments above the recipe, not inside it. Indented comments are interpreted as shell commands and will cause errors.
+- **Avoid Unix-only commands** (e.g., `find`, `rm -rf`) in recipes. These will fail on Windows. If cleanup is needed, add a comment instructing Windows users to delete files/folders manually.
+- **If platform-specific logic is required**, document it clearly and provide PowerShell or batch alternatives for Windows users.
+
+**Example of a correct, cross-platform clean target:**
+```makefile
+# Note: The following lines for removing Python cache files only work on Unix-like systems.
+# On Windows, delete __pycache__ and .pyc files manually or use a PowerShell script.
+# find . -type d -name "__pycache__" -exec rm -r {} +
+# find . -type f -name "*.pyc" -delete
+# On Windows, manually delete frontend/dist and frontend/node_modules/.vite if needed.
+clean: down
+	@echo Cleaning up Docker artifacts...
+	$(DOCKER_COMPOSE) rm -f
+	@echo Cleaning up Python artifacts...
+	@echo Cleaning up frontend build artifacts...
+	@echo Cleanup complete.
+```
 
 **Remember: A focused Makefile eliminates confusion and provides a consistent interface for essential development tasks. Keep it simple but comprehensive for daily workflows.**
+
+## Cross-Platform Compatibility
+
+Makefiles used in this project MUST be compatible with both Unix-like shells (bash, zsh) and Windows PowerShell.
+
+1.  **Command Chaining:** Do not use `&&` to chain commands. Use separate lines for each command within a target. For complex, single-line needs, verify syntax works on both platforms or use a separate script.
+2.  **File System Operations:** Do not use platform-specific commands like `rm -rf`, `cp`, or `find`. If a cleanup task is needed, provide guidance in comments for manual deletion or write a cross-platform script (e.g., in Python or Node.js).
+3.  **Output:** Do not use ANSI color codes or other non-standard characters in `@echo` statements, as they render incorrectly on standard Windows terminals.
+
+## Standard Targets
+
+A `Makefile` MUST be provided in the root of the project to standardize common development tasks. It should include the following targets:
+
+-   **ps**: Lists all running service containers.
+-   **clean**: Stops all services and removes all build artifacts.
+
+### setup
+
+A `setup` target SHOULD be provided as the primary entry point for new developers. This target is responsible for creating a complete, ready-to-code development environment.
+
+-   **Responsibilities:**
+    -   Install backend dependencies using the chosen package manager (e.g., `poetry install`).
+    -   Install frontend dependencies if a frontend exists (e.g., `npm install`).
+    -   Install any required Git hooks if a hook manager is present (e.g., `pre-commit install`).
