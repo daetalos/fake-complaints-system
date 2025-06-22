@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "test-spectrum-system"
+version = "0.1.0"
+description = "Backend for the Test Spectrum System."
+authors = ["Mark O'Brien <markmikeobrien@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.111.0"
+uvicorn = "^0.29.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+black = "^24.4.2"
+flake8 = "^7.0.0"
+mypy = "^1.10.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
