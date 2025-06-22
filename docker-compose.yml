@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=info
+      - ENVIRONMENT=production
+    volumes:
+      # In development, you might want to mount the source code
+      # For now, we are building a production-style image
+      - ./backend:/app
+      - backend_venv:/app/.venv
+    networks:
+      - app-network
+
+volumes:
+  backend_venv:
+
+networks:
+  app-network:
+    driver: bridge 

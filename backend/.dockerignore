@@ -1,0 +1,28 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+
+# Poetry
+.venv
+dist
+*.egg-info
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# IDEs
+.vscode
+.idea
+
+# OS
+.DS_Store
+
+# Logs
+logs/
+*.log 
