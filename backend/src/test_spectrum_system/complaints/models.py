@@ -4,6 +4,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     String,
     Text,
     UniqueConstraint,
@@ -33,6 +34,42 @@ class ComplaintCategory(Base):
         )
 
 
+class Complainant(Base):
+    __tablename__ = "complainants"
+
+    complainant_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False)
+    phone = Column(String(50), nullable=True)
+
+    # Address fields as required by the execution plan
+    address_line1 = Column(String(255), nullable=False)
+    address_line2 = Column(String(255), nullable=True)
+    city = Column(String(100), nullable=False)
+    postcode = Column(String(20), nullable=False)
+
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_complainant_email', 'email'),
+        Index('idx_complainant_postcode', 'postcode'),
+        Index('idx_complainant_city', 'city'),
+    )
+
+    def __repr__(self):
+        return (f"<Complainant(complainant_id={self.complainant_id}, "
+                f"name='{self.name}')>")
+
+
 class Complaint(Base):
     __tablename__ = "complaints"
 
@@ -41,6 +78,11 @@ class Complaint(Base):
     category_id = Column(
         UUID(as_uuid=True),
         ForeignKey("complaint_categories.category_id"),
+        nullable=False
+    )
+    complainant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("complainants.complainant_id"),
         nullable=False
     )
     patient_id = Column(
@@ -63,6 +105,7 @@ class Complaint(Base):
         nullable=False,
     )
     category = relationship("ComplaintCategory", backref="complaints")
+    complainant = relationship("Complainant", backref="complaints")
     patient = relationship("Patient", backref="complaints")
     case = relationship("Case", backref="complaints")
 
@@ -86,7 +129,8 @@ class Case(Base):
 
     case_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     case_reference = Column(String, nullable=False, unique=True)
-    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.patient_id"), nullable=False)
+    patient_id = Column(UUID(as_uuid=True),
+                        ForeignKey("patients.patient_id"), nullable=False)
 
     patient = relationship("Patient", backref="cases")
 

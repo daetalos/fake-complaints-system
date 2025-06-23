@@ -24,6 +24,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/complainants/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Complainant
+         * @description Creates a new complainant with address information.
+         */
+        post: operations["create_complainant_api_complainants__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/complainants/{complainant_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Complainant
+         * @description Retrieves a complainant by ID including address information.
+         */
+        get: operations["get_complainant_api_complainants__complainant_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/complainants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Complainants
+         * @description Lists complainants, optionally filtered by name or email.
+         */
+        get: operations["list_complainants_api_complainants_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/complaints/": {
         parameters: {
             query?: never;
@@ -38,6 +98,100 @@ export interface paths {
          * @description Creates a new complaint.
          */
         post: operations["create_complaint_api_complaints__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/complaints/{complaint_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Complaint */
+        get: operations["get_complaint_api_complaints__complaint_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/patients-test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Patients Test
+         * @description Simple test endpoint to debug the issue
+         */
+        get: operations["list_patients_test_api_patients_test_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/patients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Patients */
+        get: operations["list_patients_api_patients_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Cases
+         * @description Get all cases, optionally filtered by patient_id
+         */
+        get: operations["list_cases_api_cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health Check
+         * @description Simple health check endpoint to confirm the API is running.
+         */
+        get: operations["health_check_api_health_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -65,6 +219,90 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CaseSummary */
+        CaseSummary: {
+            /**
+             * Case Id
+             * Format: uuid
+             */
+            case_id: string;
+            /** Case Reference */
+            case_reference: string;
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+        };
+        /** Complainant */
+        Complainant: {
+            /** Name */
+            name: string;
+            /** Email */
+            email: string;
+            /** Phone */
+            phone?: string | null;
+            /** Address Line1 */
+            address_line1: string;
+            /** Address Line2 */
+            address_line2?: string | null;
+            /** City */
+            city: string;
+            /** Postcode */
+            postcode: string;
+            /**
+             * Complainant Id
+             * Format: uuid
+             */
+            complainant_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ComplainantCreate */
+        ComplainantCreate: {
+            /** Name */
+            name: string;
+            /** Email */
+            email: string;
+            /** Phone */
+            phone?: string | null;
+            /** Address Line1 */
+            address_line1: string;
+            /** Address Line2 */
+            address_line2?: string | null;
+            /** City */
+            city: string;
+            /** Postcode */
+            postcode: string;
+        };
+        /** ComplainantSummary */
+        ComplainantSummary: {
+            /**
+             * Complainant Id
+             * Format: uuid
+             */
+            complainant_id: string;
+            /** Name */
+            name: string;
+            /** Email */
+            email: string;
+            /** Address Line1 */
+            address_line1: string;
+            /** Address Line2 */
+            address_line2: string | null;
+            /** City */
+            city: string;
+            /** Postcode */
+            postcode: string;
+        };
         /** Complaint */
         Complaint: {
             /** Description */
@@ -80,15 +318,10 @@ export interface components {
              */
             category_id: string;
             /**
-             * Created At
-             * Format: date-time
+             * Complainant Id
+             * Format: uuid
              */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
+            complainant_id: string;
             /**
              * Patient Id
              * Format: uuid
@@ -100,12 +333,17 @@ export interface components {
              */
             case_id: string;
             /**
-             * Patient
+             * Created At
+             * Format: date-time
              */
-            patient: components["schemas"]["PatientSummary"];
+            created_at: string;
             /**
-             * Case
+             * Updated At
+             * Format: date-time
              */
+            updated_at: string;
+            complainant: components["schemas"]["ComplainantSummary"];
+            patient: components["schemas"]["PatientSummary"];
             case: components["schemas"]["CaseSummary"];
         };
         /** ComplaintCategory */
@@ -125,6 +363,11 @@ export interface components {
              */
             category_id: string;
             /**
+             * Complainant Id
+             * Format: uuid
+             */
+            complainant_id: string;
+            /**
              * Patient Id
              * Format: uuid
              */
@@ -139,6 +382,21 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** PatientSummary */
+        PatientSummary: {
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Dob
+             * Format: date-time
+             */
+            dob: string;
         };
         /** SubCategory */
         SubCategory: {
@@ -158,24 +416,6 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
-        };
-        /** Patient Summary */
-        PatientSummary: {
-            /** Patient Id */
-            patient_id: string;
-            /** Name */
-            name: string;
-            /** Date of Birth */
-            dob: string;
-        };
-        /** Case Summary */
-        CaseSummary: {
-            /** Case Id */
-            case_id: string;
-            /** Case Reference */
-            case_reference: string;
-            /** Patient Id */
-            patient_id: string;
         };
     };
     responses: never;
@@ -202,6 +442,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ComplaintCategory"][];
+                };
+            };
+        };
+    };
+    create_complainant_api_complainants__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComplainantCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Complainant"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_complainant_api_complainants__complainant_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complainant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Complainant"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_complainants_api_complainants_get: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplainantSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -235,6 +570,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_complaint_api_complaints__complaint_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Complaint"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_patients_test_api_patients_test_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    list_patients_api_patients_get: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cases_api_cases_get: {
+        parameters: {
+            query?: {
+                patient_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    health_check_api_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

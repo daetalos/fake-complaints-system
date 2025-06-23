@@ -14,7 +14,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from test_spectrum_system.complaints.models import (  # noqa: F401
     Case,
+    Complainant,
     Complaint,
+    ComplaintCategory,
     Patient,
 )
 from test_spectrum_system.config.core import settings
