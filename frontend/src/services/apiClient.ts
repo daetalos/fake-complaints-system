@@ -3,6 +3,9 @@ type PatientSummary = components['schemas']['PatientSummary'];
 type CaseSummary = components['schemas']['CaseSummary'];
 type ComplaintCreate = components['schemas']['ComplaintCreate'];
 type Complaint = components['schemas']['Complaint'];
+type ComplainantCreate = components['schemas']['ComplainantCreate'];
+type Complainant = components['schemas']['Complainant'];
+type ComplainantSummary = components['schemas']['ComplainantSummary'];
 
 const apiClient = {
   post: async <T>(url: string, data: Record<string, unknown>): Promise<T> => {
@@ -37,6 +40,15 @@ const apiClient = {
   },
   createComplaint: async (data: ComplaintCreate): Promise<Complaint> => {
     return apiClient.post<Complaint>('/api/complaints/', data);
+  },
+  getComplainants: async (q?: string): Promise<ComplainantSummary[]> => {
+    const url = q ? `/api/complainants?q=${encodeURIComponent(q)}` : '/api/complainants';
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch complainants');
+    return response.json();
+  },
+  createComplainant: async (data: ComplainantCreate): Promise<Complainant> => {
+    return apiClient.post<Complainant>('/api/complainants/', data);
   },
 };
 

@@ -49,7 +49,8 @@ async def seed_categories(db: AsyncSession):
     existing_categories = result.scalars().all()
 
     if existing_categories:
-        logger.info(f"Found {len(existing_categories)} existing categories. Skipping category seeding.")
+        logger.info(f"Found {len(existing_categories)} existing categories. "
+                    f"Skipping category seeding.")
         return
 
     count = 0
@@ -76,7 +77,8 @@ async def seed_patients(db: AsyncSession):
     existing_patients = result.scalars().all()
 
     if existing_patients:
-        logger.info(f"Found {len(existing_patients)} existing patients. Skipping patient seeding.")
+        logger.info(f"Found {len(existing_patients)} existing patients. "
+                    f"Skipping patient seeding.")
         return existing_patients
 
     patients = []
@@ -107,7 +109,8 @@ async def seed_cases(db: AsyncSession, patients):
     existing_cases = result.scalars().all()
 
     if existing_cases:
-        logger.info(f"Found {len(existing_cases)} existing cases. Skipping case seeding.")
+        logger.info(f"Found {len(existing_cases)} existing cases. "
+                    f"Skipping case seeding.")
         return
 
     current_year = datetime.now().year
