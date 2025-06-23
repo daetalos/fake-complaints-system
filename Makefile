@@ -77,15 +77,16 @@ ps:
 	@echo Current container status:
 	$(DOCKER_COMPOSE) ps
 
-## clean: Stops services and removes all build artifacts and temporary files.
-# Note: The following lines for removing Python cache files only work on Unix-like systems.
-# On Windows, delete __pycache__ and .pyc files manually or use a PowerShell script.
+## clean: Stops services and removes all build artifacts, containers, and database volumes.
+# This gives you a completely fresh start - perfect for development.
 clean: down
 	@echo Cleaning up Docker artifacts...
 	$(DOCKER_COMPOSE) rm -f
+	@echo Removing database volume for fresh start...
+	docker volume rm test-spectrum-system_postgres_data_fresh 2>NUL || echo Volume already removed or doesn't exist
 	@echo Cleaning up Python artifacts...
 	@echo Cleaning up frontend build artifacts...
-	@echo Cleanup complete.
+	@echo Cleanup complete - database will be recreated on next 'make up'.
 
 ## lint: Checks the backend and frontend code for any linting issues.
 lint:
@@ -111,5 +112,5 @@ test-backend:
 ## test-frontend: Runs the frontend test suite using Vitest.
 test-frontend:
 	@echo "Running frontend tests..."
-	(cd frontend && npm test)
-	@echo "Frontend tests complete." 
+	(cd frontend && npm test -- --run --reporter=default)
+	@echo "Frontend tests complete."

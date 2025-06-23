@@ -89,6 +89,24 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /**
+             * Case Id
+             * Format: uuid
+             */
+            case_id: string;
+            /**
+             * Patient
+             */
+            patient: components["schemas"]["PatientSummary"];
+            /**
+             * Case
+             */
+            case: components["schemas"]["CaseSummary"];
         };
         /** ComplaintCategory */
         ComplaintCategory: {
@@ -106,6 +124,16 @@ export interface components {
              * Format: uuid
              */
             category_id: string;
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /**
+             * Case Id
+             * Format: uuid
+             */
+            case_id: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -130,6 +158,24 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** Patient Summary */
+        PatientSummary: {
+            /** Patient Id */
+            patient_id: string;
+            /** Name */
+            name: string;
+            /** Date of Birth */
+            dob: string;
+        };
+        /** Case Summary */
+        CaseSummary: {
+            /** Case Id */
+            case_id: string;
+            /** Case Reference */
+            case_reference: string;
+            /** Patient Id */
+            patient_id: string;
         };
     };
     responses: never;

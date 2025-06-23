@@ -16,6 +16,12 @@ echo "Running database migrations..."
 poetry run alembic upgrade head
 echo "Database migrations complete."
 
+# Seed database with initial data (idempotent - safe to run multiple times)
+# This ensures categories, patients, and cases are available for testing
+echo "Seeding database with initial data..."
+poetry run python src/test_spectrum_system/scripts/seed_data.py
+echo "Database seeding complete."
+
 # Execute the main command (passed as arguments to this script)
 # This will be the uvicorn server command from the Dockerfile's CMD
 exec "$@" 

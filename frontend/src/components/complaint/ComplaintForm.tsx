@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import type { components } from '../../types/api';
+import apiClient from '../../services/apiClient';
 
 type ComplaintCategory = components['schemas']['ComplaintCategory'];
 type SubCategory = components['schemas']['SubCategory'];
+type PatientSummary = components['schemas']['PatientSummary'];
+type CaseSummary = components['schemas']['CaseSummary'];
 
 const ComplaintForm = () => {
     const [description, setDescription] = useState('');
@@ -12,6 +15,11 @@ const ComplaintForm = () => {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [patients, setPatients] = useState<PatientSummary[]>([]);
+    const [patientQuery, setPatientQuery] = useState('');
+    const [selectedPatient, setSelectedPatient] = useState<PatientSummary | null>(null);
+    const [cases, setCases] = useState<CaseSummary[]>([]);
+    const [selectedCase, setSelectedCase] = useState<CaseSummary | null>(null);
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -33,38 +41,61 @@ const ComplaintForm = () => {
         fetchCategories();
     }, []);
 
+    useEffect(() => {
+        const fetchPatients = async () => {
+            try {
+                const data = await apiClient.getPatients(patientQuery);
+                setPatients(data);
+            } catch (err) {
+                setError('Failed to fetch patients');
+            }
+        };
+        fetchPatients();
+    }, [patientQuery]);
+
+    useEffect(() => {
+        if (selectedPatient) {
+            const fetchCases = async () => {
+                try {
+                    const data = await apiClient.getCases(selectedPatient.patient_id);
+                    setCases(data);
+                } catch (err) {
+                    setError('Failed to fetch cases');
+                }
+            };
+            fetchCases();
+        } else {
+            setCases([]);
+            setSelectedCase(null);
+        }
+    }, [selectedPatient]);
+
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
         setSubmitting(true);
         setError('');
         setSuccess('');
 
-        if (!description || !selectedSubCategory) {
+        if (!description || !selectedSubCategory || !selectedPatient || !selectedCase) {
             setError('Please fill in all fields.');
             setSubmitting(false);
             return;
         }
 
         try {
-            const apiUrl = `/api/complaints/`;
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ description, category_id: selectedSubCategory }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to submit complaint.');
-            }
-
-            const data = await response.json();
-            setSuccess(`Complaint submitted successfully! Complaint ID: ${data.complaint_id}`);
+            const data = {
+                description,
+                category_id: selectedSubCategory,
+                patient_id: selectedPatient.patient_id,
+                case_id: selectedCase.case_id,
+            };
+            const response = await apiClient.createComplaint(data);
+            setSuccess(`Complaint submitted successfully! Complaint ID: ${response.complaint_id}`);
             setDescription('');
             setSelectedMainCategory('');
             setSelectedSubCategory('');
+            setSelectedPatient(null);
+            setSelectedCase(null);
         } catch (err) {
             if (err instanceof Error) {
                 setError(err.message);
@@ -121,6 +152,59 @@ const ComplaintForm = () => {
                     </select>
                 </div>
                 <div>
+                    <label htmlFor="patient-select">Patient:</label>
+                    <input
+                        id="patient-search"
+                        type="text"
+                        value={patientQuery}
+                        onChange={(e) => setPatientQuery(e.target.value)}
+                        placeholder="Search by name or ID"
+                        style={{ width: '100%', padding: '8px', marginBottom: '10px' }}
+                    />
+                    <select
+                        id="patient-select"
+                        value={selectedPatient?.patient_id || ''}
+                        onChange={(e) => {
+                            const patient = patients.find(p => p.patient_id === e.target.value) || null;
+                            setSelectedPatient(patient);
+                        }}
+                        style={{ width: '100%', padding: '8px', marginBottom: '10px' }}
+                    >
+                        <option value="">Select a Patient</option>
+                        {patients.map((patient) => (
+                            <option key={patient.patient_id} value={patient.patient_id}>
+                                {patient.name} (DOB: {patient.dob})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label htmlFor="case-select">Case:</label>
+                    <select
+                        id="case-select"
+                        value={selectedCase?.case_id || ''}
+                        onChange={(e) => {
+                            const c = cases.find(cs => cs.case_id === e.target.value) || null;
+                            setSelectedCase(c);
+                        }}
+                        disabled={!selectedPatient}
+                        style={{ width: '100%', padding: '8px', marginBottom: '10px' }}
+                    >
+                        <option value="">Select a Case</option>
+                        {cases.map((c) => (
+                            <option key={c.case_id} value={c.case_id}>
+                                {c.case_reference}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                {selectedPatient && selectedCase && (
+                    <div style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '10px' }}>
+                        <strong>Selected Patient:</strong> {selectedPatient.name} (DOB: {selectedPatient.dob})<br />
+                        <strong>Selected Case:</strong> {selectedCase.case_reference}
+                    </div>
+                )}
+                <div>
                     <label htmlFor="description">Description:</label>
                     <textarea
                         id="description"
@@ -130,7 +214,7 @@ const ComplaintForm = () => {
                         style={{ width: '100%', padding: '8px' }}
                     />
                 </div>
-                <button type="submit" disabled={submitting}>
+                <button type="submit" disabled={submitting || !selectedPatient || !selectedCase}>
                     {submitting ? 'Submitting...' : 'Submit'}
                 </button>
             </form>

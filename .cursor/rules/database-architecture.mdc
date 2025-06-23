@@ -528,6 +528,12 @@ def downgrade():
     op.drop_table('users')
 ```
 
+## Alembic Model Discovery Rule
+- **ALWAYS import all models in `alembic/env.py`** to ensure Alembic's autogenerate can detect all schema changes. If models are not imported, Alembic will not see them and migrations may be incomplete or missing. Use a single import line or a `models/__init__.py` that imports all models.
+
+## Migration Generation Prerequisite Rule
+- **ALWAYS apply all outstanding migrations before generating a new migration.** Run `alembic upgrade head` (or equivalent) to ensure the target database is up to date. Alembic will refuse to generate new migrations if the database is not current.
+
 ## Database Query Optimization
 
 ### Efficient Query Patterns
