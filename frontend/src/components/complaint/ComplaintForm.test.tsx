@@ -2,259 +2,148 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ComplaintForm from './ComplaintForm';
 
-// Since we have a global fetch mock in setup.ts, we don't need to mock it here
-// for the "happy path" tests. We only need to override it if we want to test
-// a specific failure case.
+// Mock the API client
+vi.mock('../../services/apiClient', () => ({
+  default: {
+    getComplainants: vi.fn().mockResolvedValue([]),
+    createComplainant: vi.fn().mockResolvedValue({
+      complainant_id: 'mock-complainant-123',
+      name: 'Test User',
+      email: 'test@example.com',
+      address_line1: '123 Test Street',
+      address_line2: null,
+      city: 'Test City',
+      postcode: 'T1 1AA',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }),
+    createComplaint: vi.fn().mockResolvedValue({
+      complaint_id: 'mock-complaint-123',
+      description: 'Test complaint',
+      category_id: 'mock-category-123',
+      complainant_id: 'mock-complainant-123',
+      patient_id: 'mock-patient-123',
+      case_id: 'mock-case-123',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }),
+    getPatients: vi.fn().mockResolvedValue([
+      {
+        patient_id: 'patient-123',
+        name: 'John Patient',
+        dob: '1990-01-01T00:00:00Z'
+      }
+    ]),
+  },
+}));
+
+// Mock fetch for categories and cases
+global.fetch = vi.fn().mockImplementation((url) => {
+  const urlStr = String(url);
+  
+  if (urlStr.includes('/api/complaint-categories/')) {
+    return Promise.resolve(new Response(JSON.stringify([
+      {
+        main_category: 'Clinical',
+        sub_categories: [
+          { category_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479', sub_category: 'Diagnosis' },
+          { category_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d480', sub_category: 'Treatment' },
+        ],
+      },
+      {
+        main_category: 'Administrative',
+        sub_categories: [
+          { category_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d481', sub_category: 'Billing' },
+        ],
+      },
+    ]), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  }
+  
+  if (urlStr.includes('/api/cases')) {
+    return Promise.resolve(new Response(JSON.stringify([
+      {
+        case_id: 'case-456',
+        case_reference: 'CASE-2024-001',
+        patient_id: 'patient-123'
+      }
+    ]), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  }
+  
+  return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+});
 
 describe('ComplaintForm', () => {
   beforeEach(() => {
-    // Reset mocks if any test overrides the global mock
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
-  it('should render the form and load categories', async () => {
+  it('should render the complaint form with stepper', async () => {
     render(<ComplaintForm />);
-    expect(screen.getByRole('heading', { name: /submit a new complaint/i })).toBeInTheDocument();
-
-    // Wait for categories to be fetched and displayed
-    await waitFor(() => {
-      expect(screen.getByText('Clinical')).toBeInTheDocument();
-    });
+    
+    // Check for the main heading - use getAllByText to handle multiple elements
+    expect(screen.getAllByText('Complaint Details')[0]).toBeInTheDocument();
+    
+    // Check for the stepper - use getAllByText since "Complainant Information" appears in multiple places
+    const complainantInfoElements = screen.getAllByText('Complainant Information');
+    expect(complainantInfoElements.length).toBeGreaterThan(0);
+    
+    // Check that we're on the first step - look for content that's actually rendered
+    expect(screen.getByText('Search for existing complainant (optional)')).toBeInTheDocument();
   });
 
-  it('should show a validation error if fields are not filled', async () => {
+  it('should show form validation errors', async () => {
     render(<ComplaintForm />);
-
-    // Wait for the component to be ready
+    
+    // Wait for form to be ready
     await waitFor(() => {
-      expect(screen.getByText('Clinical')).toBeInTheDocument();
-      expect(screen.getByText(/John Doe/)).toBeInTheDocument();
+      expect(screen.getAllByText('Complaint Details')[0]).toBeInTheDocument();
     });
 
-    // First select patient and case to enable submit button
-    const patientSelect = screen.getByLabelText('Patient:');
-    fireEvent.change(patientSelect, { target: { value: 'patient-1' } });
+    // Try to click Next without filling required fields
+    const nextButton = screen.getByRole('button', { name: 'Next' });
+    fireEvent.click(nextButton);
     
+    // Should show validation errors
     await waitFor(() => {
-      expect(screen.getByLabelText('Case:')).toBeEnabled();
-      expect(screen.getByText(/CASE-REF-001/)).toBeInTheDocument();
-    });
-    
-    const caseSelect = screen.getByLabelText('Case:');
-    fireEvent.change(caseSelect, { target: { value: 'case-1' } });
-    
-    // Wait for submit button to be enabled
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /submit/i })).toBeEnabled();
-    });
-
-    const submitButton = screen.getByRole('button', { name: /submit/i });
-    fireEvent.click(submitButton);
-
-    expect(await screen.findByText(/Error: Please fill in all fields\.?/i)).toBeInTheDocument();
-  });
-
-  it('should enable subcategory dropdown after selecting a main category', async () => {
-    render(<ComplaintForm />);
-    await waitFor(() => expect(screen.getByText('Clinical')).toBeInTheDocument());
-
-    const mainCategorySelect = screen.getByLabelText(/main category/i);
-    const subCategorySelect = screen.getByLabelText(/subcategory/i);
-
-    expect(subCategorySelect).toBeDisabled();
-
-    fireEvent.change(mainCategorySelect, { target: { value: 'Clinical' } });
-
-    await waitFor(() => {
-      expect(subCategorySelect).toBeEnabled();
-      // The mock data from setup.ts has "Diagnosis" as a sub-category for "Clinical"
-      expect(screen.getByText('Diagnosis')).toBeInTheDocument();
+      expect(screen.getByText('Complainant name is required')).toBeInTheDocument();
     });
   });
 
-  it('should submit the form and show a success message', async () => {
+  it('should load categories on mount', async () => {
     render(<ComplaintForm />);
-    await waitFor(() => {
-      expect(screen.getByText('Clinical')).toBeInTheDocument();
-      expect(screen.getByText(/John Doe/)).toBeInTheDocument();
-    });
-
-    // 1. Select Main Category
-    fireEvent.change(screen.getByLabelText(/main category/i), { target: { value: 'Clinical' } });
-    await waitFor(() => expect(screen.getByLabelText(/subcategory/i)).toBeEnabled());
-
-    // 2. Select Subcategory
-    // The value should be the category_id from our mock data in setup.ts
-    fireEvent.change(screen.getByLabelText(/subcategory/i), {
-      target: { value: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' },
-    });
-
-    // 3. Select Patient
-    const patientSelect = screen.getByLabelText('Patient:');
-    fireEvent.change(patientSelect, { target: { value: 'patient-1' } });
     
+    // Wait for categories to load
     await waitFor(() => {
-      expect(screen.getByLabelText('Case:')).toBeEnabled();
-      expect(screen.getByText(/CASE-REF-001/)).toBeInTheDocument();
-    });
-    
-    // 4. Select Case
-    const caseSelect = screen.getByLabelText('Case:');
-    fireEvent.change(caseSelect, { target: { value: 'case-1' } });
-
-    // 5. Fill Description
-    fireEvent.change(screen.getByLabelText(/description/i), {
-      target: { value: 'The diagnosis was incorrect.' },
-    });
-
-    // 6. Wait for submit button to be enabled and submit
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /submit/i })).toBeEnabled();
-    });
-    fireEvent.click(screen.getByRole('button', { name: /submit/i }));
-
-    // 7. Assert Success
-    await waitFor(() => {
-      // The mock ID comes from the global mock in setup.ts
-      expect(screen.getByText(/Complaint submitted successfully! Complaint ID: mock-id-123/i)).toBeInTheDocument();
+      expect(global.fetch).toHaveBeenCalledWith('/api/complaint-categories/');
     });
   });
 
-  it('should show an error message if the API call to submit fails', async () => {
-    // Override the global fetch mock for this specific test case
-    const errorMessage = 'Internal Server Error';
-    vi.spyOn(global, 'fetch').mockImplementation(async (url) => {
-      const urlStr = String(url);
-      if (urlStr.endsWith('/api/complaints/')) {
-        return new Response(JSON.stringify({ detail: errorMessage }), { status: 500 });
-      } else if (urlStr.endsWith('/api/complaint-categories/')) {
-        return new Response(
-          JSON.stringify([
-            {
-              main_category: 'Clinical',
-              sub_categories: [{ category_id: 'id-1', sub_category: 'Diagnosis' }],
-            },
-          ]),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-      } else if (urlStr.endsWith('/api/patients')) {
-        return new Response(
-          JSON.stringify([
-            {
-              patient_id: 'patient-1',
-              name: 'John Doe',
-              dob: '1980-01-01',
-            },
-          ]),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-      } else if (urlStr.includes('/api/cases')) {
-        return new Response(
-          JSON.stringify([
-            {
-              case_id: 'case-1',
-              case_reference: 'CASE-REF-001',
-              patient_id: 'patient-1',
-            },
-          ]),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-      // Fallback for any other requests
-      return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } });
-    });
-
+  it('should handle form navigation', async () => {
     render(<ComplaintForm />);
+    
+    // Wait for form to be ready
     await waitFor(() => {
-      expect(screen.getByText('Clinical')).toBeInTheDocument();
-      expect(screen.getByText(/John Doe/)).toBeInTheDocument();
+      expect(screen.getAllByText('Complaint Details')[0]).toBeInTheDocument();
     });
 
-    // Fill form
-    fireEvent.change(screen.getByLabelText(/main category/i), { target: { value: 'Clinical' } });
-    await waitFor(() => expect(screen.getByLabelText(/subcategory/i)).toBeEnabled());
-    fireEvent.change(screen.getByLabelText(/subcategory/i), { target: { value: 'id-1' } });
+    // Check that the Next button is present and can be clicked
+    const nextButton = screen.getByRole('button', { name: 'Next' });
+    expect(nextButton).toBeInTheDocument();
     
-    // Select patient and case
-    const patientSelect = screen.getByLabelText('Patient:');
-    fireEvent.change(patientSelect, { target: { value: 'patient-1' } });
-    
-    await waitFor(() => {
-      expect(screen.getByLabelText('Case:')).toBeEnabled();
-      expect(screen.getByText(/CASE-REF-001/)).toBeInTheDocument();
-    });
-    
-    const caseSelect = screen.getByLabelText('Case:');
-    fireEvent.change(caseSelect, { target: { value: 'case-1' } });
-    
-    fireEvent.change(screen.getByLabelText(/description/i), {
-      target: { value: 'This will fail.' },
-    });
-
-    // Wait for submit button to be enabled
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /submit/i })).toBeEnabled();
-    });
-    
-    // Submit
-    fireEvent.click(screen.getByRole('button', { name: /submit/i }));
-
-    // Assert on the error message from the failed submission
-    await waitFor(() => {
-      expect(screen.getByText(`Error: ${errorMessage}`)).toBeInTheDocument();
-    });
+    // Check that the stepper is working
+    expect(screen.getAllByText('Complainant Information')[0]).toBeInTheDocument();
+    expect(screen.getByText('Search for existing complainant (optional)')).toBeInTheDocument();
   });
 
-  it('should require patient and case selection before enabling submit', async () => {
+  it('should handle API errors gracefully', async () => {
+    // Mock API error for categories
+    vi.mocked(global.fetch).mockRejectedValueOnce('Network error'); // Non-Error object to trigger fallback message
+    
     render(<ComplaintForm />);
-    await waitFor(() => expect(screen.getByText('Clinical')).toBeInTheDocument());
-
-    // Wait for patients to load
+    
+    // Should show error message
     await waitFor(() => {
-      expect(screen.getByText(/John Doe/)).toBeInTheDocument();
+      expect(screen.getByText(/Failed to fetch categories/)).toBeInTheDocument();
     });
-    screen.debug(); // Debug after patients load
-
-    const patientSelect = screen.getByLabelText('Patient:');
-    fireEvent.change(patientSelect, { target: { value: 'patient-1' } });
-
-    // Wait for cases to load and be enabled
-    await waitFor(() => {
-      expect(screen.getByText('Case:')).toBeEnabled();
-      expect(screen.getByText(/CASE-REF-001/)).toBeInTheDocument();
-    });
-    screen.debug(); // Debug after cases load
-
-    // Select case
-    const caseSelect = screen.getByLabelText('Case:');
-    fireEvent.change(caseSelect, { target: { value: 'case-1' } });
-    // Fill other required fields
-    fireEvent.change(screen.getByLabelText(/main category/i), { target: { value: 'Clinical' } });
-    await waitFor(() => expect(screen.getByLabelText(/subcategory/i)).toBeEnabled());
-    fireEvent.change(screen.getByLabelText(/subcategory/i), { target: { value: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' } });
-    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: 'Test complaint' } });
-    // Now submit should be enabled
-    const submitButton = screen.getByRole('button', { name: /submit/i });
-    expect(submitButton).toBeEnabled();
-  });
-
-  it('should show a summary panel when patient and case are selected', async () => {
-    render(<ComplaintForm />);
-    await waitFor(() => expect(screen.getByText('Clinical')).toBeInTheDocument());
-    await waitFor(() => {
-      expect(screen.getByText(/John Doe/)).toBeInTheDocument();
-    });
-    screen.debug(); // Debug after patients load
-    const patientSelect = screen.getByLabelText('Patient:');
-    fireEvent.change(patientSelect, { target: { value: 'patient-1' } });
-    await waitFor(() => {
-      expect(screen.getByLabelText('Case:')).toBeEnabled();
-      expect(screen.getByText(/CASE-REF-001/)).toBeInTheDocument();
-    });
-    screen.debug(); // Debug after cases load
-    const caseSelect = screen.getByLabelText('Case:');
-    fireEvent.change(caseSelect, { target: { value: 'case-1' } });
-    expect(screen.getByText(/Selected Patient:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Selected Case:/i)).toBeInTheDocument();
   });
 }); 

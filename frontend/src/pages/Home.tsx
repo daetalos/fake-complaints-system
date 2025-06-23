@@ -14,7 +14,6 @@ import {
   LocalHospital, 
   Security, 
   Speed, 
-  People,
   Assignment,
   Phone
 } from '@mui/icons-material';
@@ -52,7 +51,7 @@ const FeatureCard = ({
            mb: 2
          }}
        >
-         {React.cloneElement(icon as React.ReactElement<any>, { 
+         {React.cloneElement(icon as React.ReactElement<{ sx?: object }>, { 
            sx: { fontSize: 32, color: '#5c6bc0' }
          })}
        </Box>

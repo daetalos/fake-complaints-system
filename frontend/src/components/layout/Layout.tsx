@@ -18,16 +18,14 @@ import {
   Divider,
   Paper
 } from '@mui/material';
-import {
-  Menu,
-  Dashboard,
-  Assignment,
-  Notifications,
-  LocalHospital,
-  Home,
-  People,
-  Settings
-} from '@mui/icons-material';
+import Menu from '@mui/icons-material/Menu';
+import Dashboard from '@mui/icons-material/Dashboard';
+import Assignment from '@mui/icons-material/Assignment';
+import Notifications from '@mui/icons-material/Notifications';
+import LocalHospital from '@mui/icons-material/LocalHospital';
+import Home from '@mui/icons-material/Home';
+import People from '@mui/icons-material/People';
+import Settings from '@mui/icons-material/Settings';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const drawerWidth = 260;
@@ -39,7 +37,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   const navigate = useNavigate();
   const location = useLocation();
 

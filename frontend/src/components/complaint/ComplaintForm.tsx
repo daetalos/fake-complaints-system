@@ -4,8 +4,6 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import {
   Box,
-  Card,
-  CardContent,
   Typography,
   TextField,
   MenuItem,
@@ -27,24 +25,18 @@ import {
   StepLabel,
   StepContent
 } from '@mui/material';
-import {
-  Assignment,
-  Person,
-  MedicalServices,
-  Category,
-  Description,
-  CheckCircle,
-  Error as ErrorIcon,
-  Send,
-  Home,
-  Email,
-  Phone
-} from '@mui/icons-material';
+import Assignment from '@mui/icons-material/Assignment';
+import Person from '@mui/icons-material/Person';
+import Category from '@mui/icons-material/Category';
+import Description from '@mui/icons-material/Description';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Home from '@mui/icons-material/Home';
+import Email from '@mui/icons-material/Email';
+import Phone from '@mui/icons-material/Phone';
 import type { components } from '../../types/api';
 import apiClient from '../../services/apiClient';
 
 type ComplaintCategory = components['schemas']['ComplaintCategory'];
-type SubCategory = components['schemas']['SubCategory'];
 type PatientSummary = components['schemas']['PatientSummary'];
 type CaseSummary = components['schemas']['CaseSummary'];
 type ComplainantCreate = components['schemas']['ComplainantCreate'];
@@ -149,7 +141,7 @@ const ComplaintForm: React.FC = () => {
     reset,
     setValue,
     trigger,
-    formState: { errors, isValid }
+    formState: { errors }
   } = useForm<FormData>({
     resolver: yupResolver(validationSchema) as any,
     defaultValues: {
@@ -203,8 +195,8 @@ const ComplaintForm: React.FC = () => {
       try {
         const data = await apiClient.getComplainants(complainantQuery);
         setComplainants(data);
-      } catch (err) {
-        console.error('Failed to fetch complainants:', err);
+      } catch (error) {
+        console.error('Failed to fetch complainants:', error);
         setComplainants([]);
       }
     };
@@ -293,6 +285,13 @@ const ComplaintForm: React.FC = () => {
   };
 
   const onSubmit = async (data: FormData) => {
+    console.log('ComplaintForm: Starting complaint submission', {
+      hasExistingComplainant: !!selectedComplainant,
+      complainantName: data.complainantName,
+      category: data.selectedSubCategory,
+      patient: data.selectedPatient?.name
+    });
+    
     setSubmitting(true);
     setError('');
     setSuccess('');
@@ -327,6 +326,10 @@ const ComplaintForm: React.FC = () => {
       };
       
       const response = await apiClient.createComplaint(payload);
+      console.log('ComplaintForm: Complaint submitted successfully', {
+        complaintId: response.complaint_id,
+        complainantId: complainantId
+      });
       setSuccess(`Complaint submitted successfully! Reference ID: ${response.complaint_id}`);
       
       // Reset form
@@ -340,6 +343,11 @@ const ComplaintForm: React.FC = () => {
       setActiveStep(0);
       
     } catch (err) {
+      console.error('ComplaintForm: Error submitting complaint', {
+        error: err instanceof Error ? err.message : 'Unknown error',
+        complainantName: data.complainantName,
+        category: data.selectedSubCategory
+      });
       setError(err instanceof Error ? err.message : 'Failed to submit complaint. Please try again.');
     } finally {
       setSubmitting(false);
