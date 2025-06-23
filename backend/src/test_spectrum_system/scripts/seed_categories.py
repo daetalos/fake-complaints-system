@@ -10,6 +10,10 @@ from test_spectrum_system.db.database import AsyncSessionLocal
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# NOTE: This script only seeds categories.
+# For comprehensive seeding (categories, patients, cases), use seed_data.py
+# which runs automatically during container startup.
+
 CATEGORIES = [
     {"main_category": "Clinical", "sub_category": "Diagnosis"},
     {"main_category": "Clinical", "sub_category": "Medication"},

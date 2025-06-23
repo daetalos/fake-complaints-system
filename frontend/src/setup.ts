@@ -46,6 +46,40 @@ global.fetch = vi.fn(async (url, options) => {
     );
   }
 
+  if (urlStr.startsWith('/api/patients')) {
+    // Return a single mock patient for all queries
+    return new Response(
+      JSON.stringify([
+        {
+          patient_id: 'patient-1',
+          name: 'John Doe',
+          dob: '1980-01-01',
+        },
+      ]),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  if (urlStr.startsWith('/api/cases')) {
+    // Return a single mock case for all queries
+    return new Response(
+      JSON.stringify([
+        {
+          case_id: 'case-1',
+          case_reference: 'CASE-REF-001',
+          patient_id: 'patient-1',
+        },
+      ]),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
   // For any other url, throw an error to fail tests with unhandled requests.
   console.error(`Unhandled request in test setup: ${options?.method || 'GET'} ${urlStr}`);
   return new Response(JSON.stringify({ message: `Unhandled request: ${urlStr}` }), {

@@ -12,7 +12,11 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 # It adds the 'src' directory to the python path.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from test_spectrum_system.complaints.models import Complaint  # noqa: F401
+from test_spectrum_system.complaints.models import (  # noqa: F401
+    Case,
+    Complaint,
+    Patient,
+)
 from test_spectrum_system.config.core import settings
 from test_spectrum_system.db.database import Base
 
