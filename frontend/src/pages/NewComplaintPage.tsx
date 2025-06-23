@@ -57,7 +57,7 @@ const InfoCard = ({
           bgcolor: '#f5f6fa'
         }}
       >
-        {React.cloneElement(icon as React.ReactElement<any>, { 
+        {React.cloneElement(icon as React.ReactElement<{ sx?: object }>, { 
           sx: { fontSize: 20, color }
         })}
       </Box>

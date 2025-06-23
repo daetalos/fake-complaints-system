@@ -50,6 +50,11 @@ const apiClient = {
   createComplainant: async (data: ComplainantCreate): Promise<Complainant> => {
     return apiClient.post<Complainant>('/api/complainants/', data);
   },
+  getComplaint: async (complaintId: string): Promise<Complaint> => {
+    const response = await fetch(`/api/complaints/${encodeURIComponent(complaintId)}`);
+    if (!response.ok) throw new Error('Failed to fetch complaint');
+    return response.json();
+  },
 };
 
 export default apiClient;
