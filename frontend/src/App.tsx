@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 const Home = React.lazy(() => import('./pages/Home'));
 const NewComplaintPage = React.lazy(() => import('./pages/NewComplaintPage'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 
 function App() {
 
@@ -33,6 +34,7 @@ function App() {
           <Suspense fallback={<div>Loading...</div>}>
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/complaints/new" element={<NewComplaintPage />} />
             </Routes>
           </Suspense>
