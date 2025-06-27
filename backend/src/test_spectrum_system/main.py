@@ -67,6 +67,32 @@ async def logging_middleware(request: Request, call_next):
         raise
 
 
+@app.get("/health")
+async def railway_health_check():
+    """
+    Railway health check endpoint - used by Railway to verify service health.
+    Also checks database connectivity.
+    """
+    try:
+        # Test database connection
+        async with engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+
+        return {
+            "status": "healthy",
+            "service": "backend",
+            "database": "connected"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "service": "backend",
+            "database": "disconnected",
+            "error": str(e)
+        }
+
+
 @app.get("/api/health")
 def health_check():
     """

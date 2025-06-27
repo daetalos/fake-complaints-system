@@ -1,0 +1,39 @@
+name: Deploy Frontend to Railway
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy Frontend to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          cd frontend
+          railway link --service=${{ secrets.RAILWAY_FRONTEND_SERVICE_ID }} --project-id=${{ secrets.RAILWAY_PROJECT_ID }}
+          
+          # Deploy the service
+          echo "Deploying frontend service..."
+          railway up --detach
+
+      - name: Verify Deployment
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          cd frontend
+          echo "Deployment completed. Checking service status..."
+          railway status 
