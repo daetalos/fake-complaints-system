@@ -24,7 +24,7 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           cd backend
-          railway link --service=${{ secrets.RAILWAY_BACKEND_SERVICE_ID }} --project-id=${{ secrets.RAILWAY_PROJECT_ID }}
+          railway link --service=${{ secrets.RAILWAY_BACKEND_SERVICE_ID }} --project_id=${{ secrets.RAILWAY_PROJECT_ID }}
           
           # Run database migrations first
           echo "Running database migrations..."

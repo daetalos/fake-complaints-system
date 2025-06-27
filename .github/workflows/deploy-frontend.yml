@@ -24,7 +24,7 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           cd frontend
-          railway link --service=${{ secrets.RAILWAY_FRONTEND_SERVICE_ID }} --project-id=${{ secrets.RAILWAY_PROJECT_ID }}
+          railway link --service=${{ secrets.RAILWAY_FRONTEND_SERVICE_ID }} --project_id=${{ secrets.RAILWAY_PROJECT_ID }}
           
           # Deploy the service
           echo "Deploying frontend service..."
