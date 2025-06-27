@@ -24,6 +24,12 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           cd backend
+          
+          # Authenticate with Railway
+          echo "Logging in to Railway..."
+          railway login --token=${{ secrets.RAILWAY_TOKEN }}
+          
+          # Link to the service
           railway link --service=${{ secrets.RAILWAY_BACKEND_SERVICE_ID }} --project_id=${{ secrets.RAILWAY_PROJECT_ID }}
           
           # Run database migrations first
