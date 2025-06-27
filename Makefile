@@ -1,4 +1,4 @@
-# Makefile for managing the Test Spectrum System development environment.
+# Makefile for managing the Test Treaty System development environment.
 # This file provides a convenient set of commands for common development tasks.
 
 # Use .PHONY to ensure these targets run even if a file with the same name exists.

@@ -280,7 +280,7 @@ const NewComplaintPage: React.FC = () => {
                         Quality Assurance
                       </Typography>
                       <Typography variant="body2" color="#5c6bc0" fontWeight="600">
-                        qa@spectrum.health
+                        qa@treaty.health
                       </Typography>
                     </Box>
                   </Box>
