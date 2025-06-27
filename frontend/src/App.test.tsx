@@ -14,7 +14,7 @@ describe('App', () => {
     render(<App />);
 
     // Check for content that's actually rendered - the layout navigation
-    expect(screen.getAllByText('SpectrumCare')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('TreatyCare')[0]).toBeInTheDocument();
 
     // Check for the navigation buttons from the Layout component
     expect(screen.getByRole('button', { name: /home/i })).toBeInTheDocument();

@@ -1,3 +1,3 @@
-# test-spectrum-system
+# test-treaty-system
  
 Project documentation will be added here. 

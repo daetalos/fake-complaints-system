@@ -143,7 +143,7 @@ const ComplaintForm: React.FC = () => {
     trigger,
     formState: { errors }
   } = useForm<FormData>({
-    resolver: yupResolver(validationSchema) as any,
+    resolver: yupResolver(validationSchema) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     defaultValues: {
       complainantName: '',
       complainantEmail: '',
@@ -176,6 +176,7 @@ const ComplaintForm: React.FC = () => {
         const data: ComplaintCategory[] = await response.json();
         setCategories(data);
       } catch (err) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         setError(err instanceof Error ? err.message : 'Failed to fetch categories');
       } finally {
         setLoading(false);

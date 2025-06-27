@@ -65,7 +65,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <LocalHospital sx={{ color: '#5c6bc0', fontSize: 32 }} />
           <Box>
             <Typography variant="h6" fontWeight="700" color="#263238">
-              SpectrumCare
+              TreatyCare
             </Typography>
             <Typography variant="caption" color="#78909c">
               Healthcare Management
